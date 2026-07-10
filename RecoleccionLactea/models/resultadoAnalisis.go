@@ -13,7 +13,7 @@ type ResultadoAnalisis struct {
 	Resultado          Resultado          `bson:"resultado"`
 	Observaciones      string             `bson:"observaciones"`
 	FechaCarga         time.Time          `bson:"fecha_carga"`
-	EncargadoID        primitive.ObjectID `bson:"encargado_id"` //id?
+	EncargadoID        primitive.ObjectID `bson:"encargado_id"`
 }
 
 type TipoMuestra string

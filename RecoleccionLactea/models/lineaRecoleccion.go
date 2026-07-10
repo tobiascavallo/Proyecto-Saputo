@@ -14,6 +14,6 @@ type LineaRecoleccion struct {
 	TemperaturaCelcius  float64            `bson:"temperatura_celcius"`
 	NumeroCisterna      int                `bson:"numero_cisterna"`
 	HoraRecoleccion     time.Time          `bson:"hora_recoleccion"`
-	CodigoMuestraDiaria string             `bson:"codigo_muestra_diaria"` //string (alfanumerico) o int? (solo numeros)
-	CodigoMuestraUFC    string             `bson:"codigo_muestra_ufc"`    //string (alfanumerico) o int? (solo numeros)
+	CodigoMuestraDiaria string             `bson:"codigo_muestra_diaria"`
+	CodigoMuestraUFC    string             `bson:"codigo_muestra_ufc"`
 }

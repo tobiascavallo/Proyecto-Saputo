@@ -13,6 +13,6 @@ type Acoplado struct {
 type TipoAcoplado string
 
 const (
-	TipoAcoplado     TipoAcoplado = "acoplado"
-	TipoSemiremolque TipoAcoplado = "semiremolque"
+	AcopladoSimple TipoAcoplado = "acoplado"
+	Semiremolque   TipoAcoplado = "semiremolque"
 )
