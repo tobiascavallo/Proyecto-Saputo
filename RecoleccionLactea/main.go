@@ -24,11 +24,15 @@ func main() {
 	}
 
 	r := gin.Default()
-	r.Run(":" + cfg.Port)
 
 	authRepo := repository.AuthRepositoryImpl{}
 	authService := services.NewAuthService(authRepo, cfg)
 	authHandler := handlers.NewAuthHandler(authService)
 
 	r.POST("/api/v1/auth/login", authHandler.Login)
+	r.POST("/api/v1/auth/refresh", authHandler.Refresh)
+	r.POST("/api/v1/auth/logout", authHandler.Logout)
+
+	r.Run(":" + cfg.Port)
+
 }
