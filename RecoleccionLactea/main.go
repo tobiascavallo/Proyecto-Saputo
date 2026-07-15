@@ -7,6 +7,7 @@ import (
 	"github.com/tobiascavallo/RecoleccionLactea/config"
 	"github.com/tobiascavallo/RecoleccionLactea/db"
 	"github.com/tobiascavallo/RecoleccionLactea/handlers"
+	"github.com/tobiascavallo/RecoleccionLactea/middleware"
 	"github.com/tobiascavallo/RecoleccionLactea/repository"
 	"github.com/tobiascavallo/RecoleccionLactea/services"
 )
@@ -25,13 +26,26 @@ func main() {
 
 	r := gin.Default()
 
+	usuarioRepo := repository.UsuarioRepositoryImpl{}
 	authRepo := repository.AuthRepositoryImpl{}
-	authService := services.NewAuthService(authRepo, cfg)
+	authService := services.NewAuthService(authRepo, usuarioRepo, cfg)
 	authHandler := handlers.NewAuthHandler(authService)
+	usuarioService := services.NewUsuarioService(usuarioRepo, cfg)
+	usuarioHandler := handlers.NewUsuarioHandler(usuarioService)
 
 	r.POST("/api/v1/auth/login", authHandler.Login)
 	r.POST("/api/v1/auth/refresh", authHandler.Refresh)
 	r.POST("/api/v1/auth/logout", authHandler.Logout)
+
+	usuario := r.Group("/api/v1/usuario")
+	usuario.Use(middleware.AuthMiddleware())
+	{
+		usuario.POST("", middleware.RequiereRol("encargado"), usuarioHandler.CrearUsuario)
+		usuario.GET("", middleware.RequiereRol("encargado"), usuarioHandler.ObtenerUsuarios)
+		usuario.GET("/:id", middleware.RequiereRol("encargado"), usuarioHandler.ObtenerUsuarioPorID)
+		usuario.PUT("/:id", middleware.RequiereRol("encargado"), usuarioHandler.ActualizarUsuario)
+		usuario.DELETE("/:id", middleware.RequiereRol("encargado"), usuarioHandler.DesactivarUsuario)
+	}
 
 	r.Run(":" + cfg.Port)
 

@@ -11,21 +11,20 @@ import (
 )
 
 type AuthRepository interface {
-	ObtenerUsuarioPorEmail(cfg config.Config, email string) (*models.Usuario, error)
 	GuardarRefreshToken(cfg config.Config, token models.RefreshToken) error
 	ObtenerRefreshToken(cfg config.Config, token string) (*models.RefreshToken, error)
 	InvalidarRefreshTokensDeUsuario(cfg config.Config, usuarioID primitive.ObjectID) error
-	ObtenerUsuarioPorID(cfg config.Config, ID primitive.ObjectID) (*models.Usuario, error)
 	InvalidarRefreshToken(cfg config.Config, token string) error
 }
 
 type AuthService struct {
-	repo AuthRepository
-	cfg  config.Config
+	repo        AuthRepository
+	usuarioRepo UsuarioRepository
+	cfg         config.Config
 }
 
-func NewAuthService(repo AuthRepository, cfg config.Config) AuthService {
-	return AuthService{repo: repo, cfg: cfg}
+func NewAuthService(repo AuthRepository, usuarioRepo UsuarioRepository, cfg config.Config) AuthService {
+	return AuthService{repo: repo, usuarioRepo: usuarioRepo, cfg: cfg}
 }
 
 // Login verifica las credenciales del usuario y devuelve un par de tokens si son correctas.
@@ -33,7 +32,7 @@ func NewAuthService(repo AuthRepository, cfg config.Config) AuthService {
 // Genera un token de acceso (24hs) y un refresh token (7 días) que se guarda en MongoDB
 // para permitir renovación de sesión y logout real del servidor.
 func (s AuthService) Login(email string, contraseña string) (string, string, error) {
-	usuario, err := s.repo.ObtenerUsuarioPorEmail(s.cfg, email)
+	usuario, err := s.usuarioRepo.ObtenerUsuarioPorEmail(s.cfg, email)
 	if err != nil {
 		return "", "", err
 	}
@@ -98,7 +97,7 @@ func (s AuthService) Refresh(tokenRefresh string) (string, string, error) {
 	}
 
 	// Obtenemos el usuario para generar el nuevo token de acceso
-	usuario, err := s.repo.ObtenerUsuarioPorID(s.cfg, refreshToken.UsuarioID)
+	usuario, err := s.usuarioRepo.ObtenerUsuarioPorID(s.cfg, refreshToken.UsuarioID)
 	if err != nil {
 		return "", "", err
 	}
