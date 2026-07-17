@@ -11,21 +11,12 @@ import (
 )
 
 type AuthRepositoryImpl struct {
+	usuarioRepo UsuarioRepositoryImpl
 }
 
 // Se recibe cfg config.Config en lugar de hardcodear el nombre de la base de datos,
 // para que el repository sea flexible entre entornos (desarrollo, producción, testing)
 // sin necesidad de modificar el código.
-func (r AuthRepositoryImpl) ObtenerUsuarioPorEmail(cfg config.Config, email string) (*models.Usuario, error) {
-	collection := db.DB.Database(cfg.MongoDB).Collection("usuarios")
-	var usuario models.Usuario
-	err := collection.FindOne(context.TODO(), bson.M{"email": email}).Decode(&usuario)
-	if err != nil {
-		return nil, err
-	}
-	return &usuario, nil
-}
-
 func (r AuthRepositoryImpl) GuardarRefreshToken(cfg config.Config, token models.RefreshToken) error {
 	collection := db.DB.Database(cfg.MongoDB).Collection("refresh_tokens")
 	_, err := collection.InsertOne(context.TODO(), token)
@@ -50,16 +41,6 @@ func (r AuthRepositoryImpl) InvalidarRefreshTokensDeUsuario(cfg config.Config, u
 		bson.M{"$set": bson.M{"activo": false}},
 	)
 	return err
-}
-
-func (r AuthRepositoryImpl) ObtenerUsuarioPorID(cfg config.Config, ID primitive.ObjectID) (*models.Usuario, error) {
-	collection := db.DB.Database(cfg.MongoDB).Collection("usuarios")
-	var usuario models.Usuario
-	err := collection.FindOne(context.TODO(), bson.M{"_id": ID}).Decode(&usuario)
-	if err != nil {
-		return nil, err
-	}
-	return &usuario, nil
 }
 
 func (r AuthRepositoryImpl) InvalidarRefreshToken(cfg config.Config, token string) error {
