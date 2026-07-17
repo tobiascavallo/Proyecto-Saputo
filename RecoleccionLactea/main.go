@@ -30,12 +30,38 @@ func main() {
 	authRepo := repository.AuthRepositoryImpl{}
 	authService := services.NewAuthService(authRepo, usuarioRepo, cfg)
 	authHandler := handlers.NewAuthHandler(authService)
-	usuarioService := services.NewUsuarioService(usuarioRepo, cfg)
-	usuarioHandler := handlers.NewUsuarioHandler(usuarioService)
 
 	r.POST("/api/v1/auth/login", authHandler.Login)
 	r.POST("/api/v1/auth/refresh", authHandler.Refresh)
 	r.POST("/api/v1/auth/logout", authHandler.Logout)
+
+	usuarioService := services.NewUsuarioService(usuarioRepo, cfg)
+	usuarioHandler := handlers.NewUsuarioHandler(usuarioService)
+
+	usuario := r.Group("/api/v1/usuario")
+	usuario.Use(middleware.AuthMiddleware())
+	{
+		usuario.POST("", middleware.RequiereRol("encargado"), usuarioHandler.CrearUsuario)
+		usuario.GET("", middleware.RequiereRol("encargado"), usuarioHandler.ObtenerUsuarios)
+		usuario.GET("/:id", middleware.RequiereRol("encargado"), usuarioHandler.ObtenerUsuarioPorID)
+		usuario.PUT("/:id", middleware.RequiereRol("encargado"), usuarioHandler.ActualizarUsuario)
+		usuario.DELETE("/:id", middleware.RequiereRol("encargado"), usuarioHandler.DesactivarUsuario)
+	}
+
+	vehiculoRepo := repository.VehiculoRepositoryImpl{}
+	vehiculoService := services.NewVehiculoService(vehiculoRepo, cfg)
+	vehiculoHandler := handlers.NewVehiculoHandler(vehiculoService)
+
+	vehiculo := r.Group("/api/v1/vehiculo")
+	vehiculo.Use(middleware.AuthMiddleware())
+	{
+		vehiculo.POST("", middleware.RequiereRol("encargado"), vehiculoHandler.CrearVehiculo)
+		vehiculo.GET("", vehiculoHandler.ObtenerVehiculos)
+		vehiculo.GET("/:id", vehiculoHandler.ObtenerVehiculoPorID)
+		vehiculo.PUT("/:id", middleware.RequiereRol("encargado"), vehiculoHandler.ActualizarVehiculo)
+		vehiculo.DELETE("/:id", middleware.RequiereRol("encargado"), vehiculoHandler.DesactivarVehiculo)
+		vehiculo.GET("/empresaTransportista/:id", vehiculoHandler.ObtenerVehiculosPorEmpresa)
+	}
 
 	r.Run(":" + cfg.Port)
 
