@@ -3,14 +3,16 @@ package handlers
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/tobiascavallo/RecoleccionLactea/dto"
+	"github.com/tobiascavallo/RecoleccionLactea/models"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type EmpresaTransportistaService interface {
-	CrearEmpresaTransportista(empresa dto.EmpresaTransportistaRequestDTO) error
-	ObtenerEmpresasTransportistas() ([]*dto.EmpresaTransportistaResponseDTO, error)
-	ObtenerEmpresaTransportistaPorId(id string) (*dto.EmpresaTransportistaResponseDTO, error)
-	ActualizarEmpresaTransportista(id string, empresa dto.EmpresaTransportistaUpdateDTO) error
-	EliminarEmpresaTransportista(id string) error
+	CrearEmpresaTransportista(model models.EmpresaTransportista) error
+	ObtenerEmpresasTransportistas() ([]models.EmpresaTransportista, error)
+	ObtenerEmpresaTransportistaPorId(id primitive.ObjectID) (*models.EmpresaTransportista, error)
+	ActualizarEmpresaTransportista(id primitive.ObjectID, model models.EmpresaTransportista) error
+	DesactivarEmpresaTransportista(id primitive.ObjectID) error
 }
 
 type EmpresaTransportistaHandler struct {
@@ -28,7 +30,13 @@ func (h EmpresaTransportistaHandler) CrearEmpresaTransportista(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.CrearEmpresaTransportista(req); err != nil {
+	model, err := dto.EmpresaTransportistaRequestToModel(req)
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.service.CrearEmpresaTransportista(model); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
@@ -43,23 +51,35 @@ func (h EmpresaTransportistaHandler) ObtenerEmpresasTransportistas(c *gin.Contex
 		return
 	}
 
-	c.JSON(200, empresas)
+	var response []dto.EmpresaTransportistaResponseDTO
+	for _, e := range empresas {
+		response = append(response, dto.EmpresaTransportistaToResponse(e))
+	}
+	c.JSON(200, response)
 }
 
 func (h EmpresaTransportistaHandler) ObtenerEmpresaTransportistaPorId(c *gin.Context) {
-	id := c.Param("id")
-
-	empresa, err := h.service.ObtenerEmpresaTransportistaPorId(id)
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
-		c.JSON(404, gin.H{"error": err.Error()})
+		c.JSON(400, gin.H{"error": "ID inválido"})
 		return
 	}
 
-	c.JSON(200, empresa)
+	empresa, err := h.service.ObtenerEmpresaTransportistaPorId(id)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "empresa transportista no encontrada"})
+		return
+	}
+
+	c.JSON(200, dto.EmpresaTransportistaToResponse(*empresa))
 }
 
 func (h EmpresaTransportistaHandler) ActualizarEmpresaTransportista(c *gin.Context) {
-	id := c.Param("id")
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "ID inválido"})
+		return
+	}
 
 	var req dto.EmpresaTransportistaUpdateDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -67,7 +87,13 @@ func (h EmpresaTransportistaHandler) ActualizarEmpresaTransportista(c *gin.Conte
 		return
 	}
 
-	if err := h.service.ActualizarEmpresaTransportista(id, req); err != nil {
+	model, err := dto.EmpresaTransportistaUpdateToModel(req)
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.service.ActualizarEmpresaTransportista(id, model); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
@@ -75,13 +101,17 @@ func (h EmpresaTransportistaHandler) ActualizarEmpresaTransportista(c *gin.Conte
 	c.JSON(200, gin.H{"mensaje": "empresa transportista actualizada correctamente"})
 }
 
-func (h EmpresaTransportistaHandler) EliminarEmpresaTransportista(c *gin.Context) {
-	id := c.Param("id")
+func (h EmpresaTransportistaHandler) DesactivarEmpresaTransportista(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "ID inválido"})
+		return
+	}
 
-	if err := h.service.EliminarEmpresaTransportista(id); err != nil {
+	if err := h.service.DesactivarEmpresaTransportista(id); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(200, gin.H{"mensaje": "empresa transportista eliminada correctamente"})
+	c.JSON(200, gin.H{"mensaje": "empresa transportista desactivada correctamente"})
 }

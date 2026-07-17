@@ -19,13 +19,18 @@ type VehiculoRepository interface {
 	ObtenerVehiculoPorPatente(cfg config.Config, patente string) (*models.Vehiculo, error)
 }
 
+type EmpresaTransportistaRepositoryPorVehiculo interface {
+	ObtenerEmpresaTransportistaPorId(cfg config.Config, id primitive.ObjectID) (models.EmpresaTransportista, error)
+}
+
 type VehiculoService struct {
 	repo VehiculoRepository
 	cfg  config.Config
+	emp  EmpresaTransportistaRepositoryPorVehiculo
 }
 
-func NewVehiculoService(repo VehiculoRepository, cfg config.Config) VehiculoService {
-	return VehiculoService{repo: repo, cfg: cfg}
+func NewVehiculoService(repo VehiculoRepository, cfg config.Config, emp EmpresaTransportistaRepository) VehiculoService {
+	return VehiculoService{repo: repo, cfg: cfg, emp: emp}
 }
 
 // CrearVehiculo valida los datos y crea el vehículo.
@@ -33,7 +38,10 @@ func (s VehiculoService) CrearVehiculo(model models.Vehiculo) error {
 	if err := validarPatente(model.Patente); err != nil {
 		return err
 	}
-	// TODO: validar que la empresa exista cuando esté el repo de empresa
+	_, err := s.emp.ObtenerEmpresaTransportistaPorId(s.cfg, model.EmpresaTransportistaID)
+	if err != nil {
+		return errors.New("la empresa transportista no existe")
+	}
 	if err := validarTipoVehiculo(model.Tipo); err != nil {
 		return err
 	}

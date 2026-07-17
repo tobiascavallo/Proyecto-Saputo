@@ -2,57 +2,56 @@ package dto
 
 import (
 	"github.com/tobiascavallo/RecoleccionLactea/models"
-	"github.com/tobiascavallo/RecoleccionLactea/utils"
 )
 
 type EmpresaTransportistaRequestDTO struct {
-	Nombre    string `json:"nombre"`
-	Cuit      string `json:"cuit"`
-	Domicilio string `json:"domicilio"`
-}
-
-type EmpresaTransportistaResponseDTO struct {
-	ID        string `json:"id"`
-	Nombre    string `json:"nombre"`
-	Cuit      string `json:"cuit"`
-	Domicilio string `json:"domicilio"`
-}
-
-func GetModelEmpresaTransportista(dto *EmpresaTransportistaRequestDTO) *models.EmpresaTransportista {
-	return &models.EmpresaTransportista{
-		Nombre:    dto.Nombre,
-		Cuit:      dto.Cuit,
-		Domicilio: dto.Domicilio,
-	}
-}
-
-func NewEmpresaTransportistaResponseDto(model models.EmpresaTransportista) *EmpresaTransportistaResponseDTO {
-	return &EmpresaTransportistaResponseDTO{
-		ID:        utils.GetStringIDFromObjectID(model.ID),
-		Nombre:    model.Nombre,
-		Cuit:      model.Cuit,
-		Domicilio: model.Domicilio,
-	}
-}
-
-func NewEmpresaTransportistaRequestDto(response EmpresaTransportistaResponseDTO) *EmpresaTransportistaRequestDTO {
-	return &EmpresaTransportistaRequestDTO{
-		Nombre:    response.Nombre,
-		Cuit:      response.Cuit,
-		Domicilio: response.Domicilio,
-	}
+    Nombre    string `json:"nombre"`
+    Cuit      string `json:"cuit"`
+    Domicilio string `json:"domicilio"`
 }
 
 type EmpresaTransportistaUpdateDTO struct {
-	Nombre    *string `json:"nombre,omitempty"`
-	Cuit      *string `json:"cuit,omitempty"`
-	Domicilio *string `json:"domicilio,omitempty"`
+    Nombre    *string `json:"nombre,omitempty"`
+    Cuit      *string `json:"cuit,omitempty"`
+    Domicilio *string `json:"domicilio,omitempty"`
 }
 
-func NewEmpresaTransportistaRequestToModel(model models.EmpresaTransportista) *EmpresaTransportistaRequestDTO {
-	return &EmpresaTransportistaRequestDTO{
-		Nombre:    model.Nombre,
-		Cuit:      model.Cuit,
-		Domicilio: model.Domicilio,
-	}
+type EmpresaTransportistaResponseDTO struct {
+    ID        string `json:"id"`
+    Nombre    string `json:"nombre"`
+    Cuit      string `json:"cuit"`
+    Domicilio string `json:"domicilio"`
+    Activo    bool   `json:"activo"`
+}
+
+func EmpresaTransportistaRequestToModel(req EmpresaTransportistaRequestDTO) (models.EmpresaTransportista, error) {
+    return models.EmpresaTransportista{
+        Nombre:    req.Nombre,
+        Cuit:      req.Cuit,
+        Domicilio: req.Domicilio,
+    }, nil
+}
+
+func EmpresaTransportistaUpdateToModel(req EmpresaTransportistaUpdateDTO) (models.EmpresaTransportista, error) {
+    model := models.EmpresaTransportista{}
+    if req.Nombre != nil {
+        model.Nombre = *req.Nombre
+    }
+    if req.Cuit != nil {
+        model.Cuit = *req.Cuit
+    }
+    if req.Domicilio != nil {
+        model.Domicilio = *req.Domicilio
+    }
+    return model, nil
+}
+
+func EmpresaTransportistaToResponse(model models.EmpresaTransportista) EmpresaTransportistaResponseDTO {
+    return EmpresaTransportistaResponseDTO{
+        ID:        model.ID.Hex(),
+        Nombre:    model.Nombre,
+        Cuit:      model.Cuit,
+        Domicilio: model.Domicilio,
+        Activo:    model.Activo,
+    }
 }

@@ -48,8 +48,22 @@ func main() {
 		usuario.DELETE("/:id", middleware.RequiereRol("encargado"), usuarioHandler.DesactivarUsuario)
 	}
 
+	empresaRepo := repository.EmpresaTransportistaRepositoryImpl{}
+	empresaService := services.NewEmpresaTransportistaService(empresaRepo, cfg)
+	empresaHandler := handlers.NewEmpresaTransportistaHandler(empresaService)
+
+	empresa := r.Group("/api/v1/empresaTransportista")
+	empresa.Use(middleware.AuthMiddleware())
+	{
+		empresa.POST("", middleware.RequiereRol("encargado"), empresaHandler.CrearEmpresaTransportista)
+		empresa.GET("", empresaHandler.ObtenerEmpresasTransportistas)
+		empresa.GET("/:id", empresaHandler.ObtenerEmpresaTransportistaPorId)
+		empresa.PUT("/:id", middleware.RequiereRol("encargado"), empresaHandler.ActualizarEmpresaTransportista)
+		empresa.DELETE("/:id", middleware.RequiereRol("encargado"), empresaHandler.DesactivarEmpresaTransportista)
+	}
+
 	vehiculoRepo := repository.VehiculoRepositoryImpl{}
-	vehiculoService := services.NewVehiculoService(vehiculoRepo, cfg)
+	vehiculoService := services.NewVehiculoService(vehiculoRepo, cfg, empresaRepo)
 	vehiculoHandler := handlers.NewVehiculoHandler(vehiculoService)
 
 	vehiculo := r.Group("/api/v1/vehiculo")

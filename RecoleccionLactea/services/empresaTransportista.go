@@ -6,16 +6,16 @@ import (
 	"strings"
 
 	"github.com/tobiascavallo/RecoleccionLactea/config"
-	"github.com/tobiascavallo/RecoleccionLactea/dto"
 	"github.com/tobiascavallo/RecoleccionLactea/models"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type EmpresaTransportistaRepository interface {
 	CrearEmpresaTransportista(cfg config.Config, model models.EmpresaTransportista) error
 	ObtenerEmpresasTransportistas(cfg config.Config) ([]models.EmpresaTransportista, error)
-	ObtenerEmpresaTransportistaPorId(cfg config.Config, id string) (models.EmpresaTransportista, error)
-	ActualizarEmpresaTransportista(cfg config.Config, id string, model models.EmpresaTransportista) error
-	EliminarEmpresaTransportista(cfg config.Config, id string) error
+	ObtenerEmpresaTransportistaPorId(cfg config.Config, id primitive.ObjectID) (models.EmpresaTransportista, error)
+	ActualizarEmpresaTransportista(cfg config.Config, id primitive.ObjectID, model models.EmpresaTransportista) error
+	DesactivarEmpresaTransportista(cfg config.Config, id primitive.ObjectID) error
 }
 
 type EmpresaTransportistaService struct {
@@ -27,19 +27,18 @@ func NewEmpresaTransportistaService(repo EmpresaTransportistaRepository, cfg con
 	return EmpresaTransportistaService{repo: repo, cfg: cfg}
 }
 
-func (s EmpresaTransportistaService) CrearEmpresaTransportista(empresa dto.EmpresaTransportistaRequestDTO) error {
-	//validaciones
-	if strings.TrimSpace(empresa.Nombre) == "" {
-		return fmt.Errorf("el nombre de la empresa transportista no puede estar vacio")
+func (s EmpresaTransportistaService) CrearEmpresaTransportista(model models.EmpresaTransportista) error {
+	if strings.TrimSpace(model.Nombre) == "" {
+		return fmt.Errorf("el nombre de la empresa transportista no puede estar vacío")
 	}
-	if strings.TrimSpace(empresa.Cuit) == "" {
-		return fmt.Errorf("el cuit de la empresa transportista no puede estar vacio")
+	if strings.TrimSpace(model.Cuit) == "" {
+		return fmt.Errorf("el cuit de la empresa transportista no puede estar vacío")
 	}
-	if strings.TrimSpace(empresa.Domicilio) == "" {
-		return fmt.Errorf("el domicilio de la empresa transportista no puede estar vacio")
+	if strings.TrimSpace(model.Domicilio) == "" {
+		return fmt.Errorf("el domicilio de la empresa transportista no puede estar vacío")
 	}
-	//validacion de cuit mediante algorito Modulo 11(algoritmo oficial).
-	valido, err := ValidarCuitEmpresa(empresa.Cuit)
+
+	valido, err := ValidarCuitEmpresa(model.Cuit)
 	if err != nil {
 		return err
 	}
@@ -47,78 +46,72 @@ func (s EmpresaTransportistaService) CrearEmpresaTransportista(empresa dto.Empre
 		return fmt.Errorf("el cuit de la empresa transportista no es válido")
 	}
 
-	empresaTransportistaModel := dto.GetModelEmpresaTransportista(&empresa)
-	return s.repo.CrearEmpresaTransportista(s.cfg, *empresaTransportistaModel)
+	model.Activo = true
+	return s.repo.CrearEmpresaTransportista(s.cfg, model)
 }
 
-func (s EmpresaTransportistaService) ObtenerEmpresasTransportistas() ([]*dto.EmpresaTransportistaResponseDTO, error) {
-	empresasDB, err := s.repo.ObtenerEmpresasTransportistas(s.cfg)
+func (s EmpresaTransportistaService) ObtenerEmpresasTransportistas() ([]models.EmpresaTransportista, error) {
+	empresas, err := s.repo.ObtenerEmpresasTransportistas(s.cfg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error al obtener empresas transportistas: %w", err)
 	}
-
-	empresas := make([]*dto.EmpresaTransportistaResponseDTO, 0, len(empresasDB)) //por si viene nil desde mongo, se convierte en []
-	for _, empresaDB := range empresasDB {
-		empresa := dto.NewEmpresaTransportistaResponseDto(empresaDB)
-		empresas = append(empresas, empresa)
+	if len(empresas) == 0 {
+		return []models.EmpresaTransportista{}, nil // devuelve lista vacía en lugar de nil
 	}
 	return empresas, nil
 }
 
-func (s EmpresaTransportistaService) ObtenerEmpresaTransportistaPorId(id string) (*dto.EmpresaTransportistaResponseDTO, error) {
+func (s EmpresaTransportistaService) ObtenerEmpresaTransportistaPorId(id primitive.ObjectID) (*models.EmpresaTransportista, error) {
+	if id.IsZero() {
+		return nil, fmt.Errorf("ID inválido")
+	}
 	empresa, err := s.repo.ObtenerEmpresaTransportistaPorId(s.cfg, id)
 	if err != nil {
 		return nil, err
 	}
-	return dto.NewEmpresaTransportistaResponseDto(empresa), nil
+	return &empresa, nil
 }
 
-func (s EmpresaTransportistaService) ActualizarEmpresaTransportista(id string, empresa dto.EmpresaTransportistaUpdateDTO) error {
-	//ver existencia de id
-	empresaResultado, err := s.repo.ObtenerEmpresaTransportistaPorId(s.cfg, id)
-	if err != nil {
-		return err //no se encontro la empresa
+func (s EmpresaTransportistaService) ActualizarEmpresaTransportista(id primitive.ObjectID, model models.EmpresaTransportista) error {
+	if id.IsZero() {
+		return fmt.Errorf("ID inválido")
 	}
-	empresaDto := dto.NewEmpresaTransportistaRequestToModel(empresaResultado)
 
-	//validaciones y asignaciones de valores
-	if empresa.Nombre != nil {
-		empresaDto.Nombre = *empresa.Nombre
+	_, err := s.repo.ObtenerEmpresaTransportistaPorId(s.cfg, id)
+	if err != nil {
+		return fmt.Errorf("empresa transportista no encontrada")
 	}
-	if empresa.Domicilio != nil {
-		empresaDto.Domicilio = *empresa.Domicilio
+
+	if model.Nombre != "" && strings.TrimSpace(model.Nombre) == "" {
+		return fmt.Errorf("el nombre no puede ser solo espacios")
 	}
-	if empresa.Cuit != nil {
-		//validar cuit
-		valido, err := ValidarCuitEmpresa(*empresa.Cuit)
+	if model.Domicilio != "" && strings.TrimSpace(model.Domicilio) == "" {
+		return fmt.Errorf("el domicilio no puede ser solo espacios")
+	}
+	if model.Cuit != "" {
+		valido, err := ValidarCuitEmpresa(model.Cuit)
 		if err != nil {
 			return err
 		}
 		if !valido {
-			return fmt.Errorf("el cuit de la empresa transportista no es válido")
+			return fmt.Errorf("el cuit no es válido")
 		}
-		empresaDto.Cuit = *empresa.Cuit
 	}
 
-	//logica
-	result := s.repo.ActualizarEmpresaTransportista(s.cfg, id, *dto.GetModelEmpresaTransportista(empresaDto))
-	if result != nil {
-		return result
-	}
-	return nil
+	return s.repo.ActualizarEmpresaTransportista(s.cfg, id, model)
 }
 
-func (s EmpresaTransportistaService) EliminarEmpresaTransportista(id string) error {
-	_, err := s.repo.ObtenerEmpresaTransportistaPorId(s.cfg, id)
-	if err != nil {
-		return err
+func (s EmpresaTransportistaService) DesactivarEmpresaTransportista(id primitive.ObjectID) error {
+	if id.IsZero() {
+		return fmt.Errorf("ID inválido")
 	}
 
-	result := s.repo.EliminarEmpresaTransportista(s.cfg, id)
-	if result != nil {
-		return result
+	_, err := s.repo.ObtenerEmpresaTransportistaPorId(s.cfg, id)
+	if err != nil {
+		return fmt.Errorf("empresa transportista no encontrada")
 	}
-	return nil
+
+	return s.repo.DesactivarEmpresaTransportista(s.cfg, id)
 }
 
 // ValidarCuitEmpresa realiza la validación completa de un CUIT de persona jurídica (empresa)
@@ -151,12 +144,11 @@ func ValidarCuitEmpresa(cuitRaw string) (bool, error) {
 	}
 
 	// 5. Algoritmo Módulo 11 (Validación del dígito verificador)
-	factores := []int{5, 4, 3, 2, 7, 6, 5, 4, 3, 2}
+	factores := []int{2, 3, 4, 5, 6, 7, 2, 3, 4, 5}
 	suma := 0
 
 	for i := 0; i < 10; i++ {
-		// Convertimos cada caracter a su valor numérico entero
-		digito, _ := strconv.Atoi(string(cuitLimpio[i]))
+		digito, _ := strconv.Atoi(string(cuitLimpio[9-i]))
 		suma += digito * factores[i]
 	}
 
@@ -172,7 +164,11 @@ func ValidarCuitEmpresa(cuitRaw string) (bool, error) {
 
 	// Obtener el último dígito del CUIT ingresado
 	digitoVerificadorReal, _ := strconv.Atoi(string(cuitLimpio[10]))
-
+	fmt.Println("CUIT limpio:", cuitLimpio)
+	fmt.Println("Suma:", suma)
+	fmt.Println("Resultado mod:", resultadoMod)
+	fmt.Println("Dígito calculado:", digitoVerificadorCalculado)
+	fmt.Println("Dígito real:", digitoVerificadorReal)
 	if digitoVerificadorCalculado != digitoVerificadorReal {
 		return false, fmt.Errorf("el CUIT es inválido (el dígito verificador no coincide)")
 	}
