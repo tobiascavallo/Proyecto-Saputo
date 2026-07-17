@@ -37,16 +37,6 @@ func main() {
 	r.POST("/api/v1/auth/refresh", authHandler.Refresh)
 	r.POST("/api/v1/auth/logout", authHandler.Logout)
 
-	usuario := r.Group("/api/v1/usuario")
-	usuario.Use(middleware.AuthMiddleware())
-	{
-		usuario.POST("", middleware.RequiereRol("encargado"), usuarioHandler.CrearUsuario)
-		usuario.GET("", middleware.RequiereRol("encargado"), usuarioHandler.ObtenerUsuarios)
-		usuario.GET("/:id", middleware.RequiereRol("encargado"), usuarioHandler.ObtenerUsuarioPorID)
-		usuario.PUT("/:id", middleware.RequiereRol("encargado"), usuarioHandler.ActualizarUsuario)
-		usuario.DELETE("/:id", middleware.RequiereRol("encargado"), usuarioHandler.DesactivarUsuario)
-	}
-
 	r.Run(":" + cfg.Port)
 
 }
