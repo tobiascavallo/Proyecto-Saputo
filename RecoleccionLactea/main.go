@@ -33,6 +33,16 @@ func main() {
 	r.POST("/api/v1/auth/refresh", authHandler.Refresh)
 	r.POST("/api/v1/auth/logout", authHandler.Logout)
 
+	empresaTransportistaRepo := repository.EmpresaTransportistaRepositoryImpl{}
+	empresaTransportistaService := services.NewEmpresaTransportistaService(empresaTransportistaRepo, cfg)
+	empresaTransportistaHandler := handlers.NewEmpresaTransportistaHandler(empresaTransportistaService)
+
+	r.POST("/api/v1/empresas-transportistas", empresaTransportistaHandler.CrearEmpresaTransportista)
+	r.GET("/api/v1/empresas-transportistas", empresaTransportistaHandler.ObtenerEmpresasTransportistas)
+	r.GET("/api/v1/empresas-transportistas/:id", empresaTransportistaHandler.ObtenerEmpresaTransportistaPorId)
+	r.PATCH("/api/v1/empresas-transportistas/:id", empresaTransportistaHandler.ActualizarEmpresaTransportista)
+	r.DELETE("/api/v1/empresas-transportistas/:id", empresaTransportistaHandler.EliminarEmpresaTransportista)
+
 	r.Run(":" + cfg.Port)
 
 }
