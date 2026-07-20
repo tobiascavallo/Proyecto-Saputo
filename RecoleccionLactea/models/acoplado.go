@@ -8,6 +8,7 @@ type Acoplado struct {
 	HabilitacionSenasa     string             `bson:"habilitacion_senasa"` //id?
 	Tipo                   TipoAcoplado       `bson:"tipo"`
 	EmpresaTransportistaID primitive.ObjectID `bson:"empresa_transportista_id"`
+	Activo                 bool               `bson:"activo"`
 }
 
 type TipoAcoplado string
