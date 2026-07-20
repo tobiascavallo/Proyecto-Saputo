@@ -87,6 +87,13 @@ func (s VehiculoService) ActualizarVehiculo(id primitive.ObjectID, model models.
 		return errors.New("vehículo no encontrado")
 	}
 
+	if !model.EmpresaTransportistaID.IsZero() {
+		_, err := s.emp.ObtenerEmpresaTransportistaPorId(s.cfg, model.EmpresaTransportistaID)
+		if err != nil {
+			return errors.New("la empresa transportista no existe")
+		}
+	}
+
 	if model.Patente != "" {
 		if err := validarPatente(model.Patente); err != nil {
 			return err

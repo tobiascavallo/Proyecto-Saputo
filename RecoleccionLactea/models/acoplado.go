@@ -15,5 +15,5 @@ type TipoAcoplado string
 
 const (
 	AcopladoSimple TipoAcoplado = "acoplado"
-	Semiremolque   TipoAcoplado = "semiremolque"
+	Semirremolque  TipoAcoplado = "semiremolque"
 )

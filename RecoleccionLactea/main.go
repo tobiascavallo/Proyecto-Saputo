@@ -77,6 +77,20 @@ func main() {
 		vehiculo.GET("/empresaTransportista/:id", vehiculoHandler.ObtenerVehiculosPorEmpresa)
 	}
 
-	r.Run(":" + cfg.Port)
+	acopladoRepo := repository.AcopladoRepositoryImpl{}
+	acopladoService := services.NewAcopladoService(acopladoRepo, empresaRepo, cfg)
+	acopladoHandler := handlers.NewAcopladoHandler(acopladoService)
 
+	acoplado := r.Group("/api/v1/acoplado")
+	acoplado.Use(middleware.AuthMiddleware())
+	{
+		acoplado.POST("", middleware.RequiereRol("encargado"), acopladoHandler.CrearAcoplado)
+		acoplado.GET("", acopladoHandler.ObtenerAcoplados)
+		acoplado.GET("/:id", acopladoHandler.ObtenerAcopladoPorID)
+		acoplado.PUT("/:id", middleware.RequiereRol("encargado"), acopladoHandler.ActualizarAcoplado)
+		acoplado.DELETE("/:id", middleware.RequiereRol("encargado"), acopladoHandler.DesactivarAcoplado)
+		acoplado.GET("/empresaTransportista/:id", acopladoHandler.ObtenerAcopladosPorEmpresa)
+	}
+
+	r.Run(":" + cfg.Port)
 }

@@ -71,7 +71,7 @@ func (r AcopladoRepositoryImpl) ObtenerAcopladosPorEmpresa(cfg config.Config, em
 	return acoplados, err
 }
 
-func (r AcopladoRepositoryImpl) ObtenerAcopladosPorPatente(cfg config.Config, patente string) (*models.Acoplado, error) {
+func (r AcopladoRepositoryImpl) ObtenerAcopladoPorPatente(cfg config.Config, patente string) (*models.Acoplado, error) {
 	collection := db.DB.Database(cfg.MongoDB).Collection("acoplados")
 	var acoplado models.Acoplado
 	err := collection.FindOne(context.TODO(), bson.M{"patente": patente}).Decode(&acoplado)
