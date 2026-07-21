@@ -92,5 +92,22 @@ func main() {
 		acoplado.GET("/empresaTransportista/:id", acopladoHandler.ObtenerAcopladosPorEmpresa)
 	}
 
+	tamberoRepo := repository.TamberoRepositoryImpl{}
+	tamberoService := services.NewTamberoService(tamberoRepo, cfg)
+	tamberoHandler := handlers.NewTamberoHandler(tamberoService)
+
+	tambero := r.Group("/api/v1/tambero")
+	tambero.Use(middleware.AuthMiddleware())
+	{
+		tambero.POST("", middleware.RequiereRol("encargado"), tamberoHandler.CrearTambero)
+		tambero.GET("", tamberoHandler.ObtenerTamberos)
+		tambero.GET("/:id", tamberoHandler.ObtenerTamberoPorID)
+		tambero.GET("/email/:email", tamberoHandler.ObtenerTamberoPorEmail)
+		tambero.GET("/cuit/:cuit", tamberoHandler.ObtenerTamberoPorCuit)
+		tambero.GET("/telefono/:telefono", tamberoHandler.ObtenerTamberoPorTelefono)
+		tambero.PATCH("/:id", middleware.RequiereRol("encargado"), tamberoHandler.ActualizarTambero)
+		tambero.DELETE("/:id", middleware.RequiereRol("encargado"), tamberoHandler.DesactivarTambero)
+	}
+
 	r.Run(":" + cfg.Port)
 }
