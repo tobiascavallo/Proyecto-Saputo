@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function Login() {
-
   // Variable reactiva para el email — arranca vacía
   const [email, setEmail] = useState("");
 
@@ -36,9 +35,13 @@ function Login() {
       // Guarda el token JWT en el navegador para usarlo en futuras llamadas
       localStorage.setItem("token", data.token);
 
-      // Redirige al usuario al dashboard
-      navigate("/dashboard");
-
+      if (data.rol === "camionero") {
+        navigate("/camionero");
+      } else if (data.rol === "empleado") {
+        navigate("/empleado");
+      } else if (data.rol === "encargado") {
+        navigate("/encargado");
+      }
     } catch (error) {
       // Si algo salió mal (ej: no hay conexión), muestra el error en pantalla
       setError("Error al conectar con el servidor");
@@ -48,13 +51,10 @@ function Login() {
   return (
     // "container mt-5" — centra el contenido y agrega espacio arriba
     <div className="container mt-5">
-
       {/* "row justify-content-center" — centra el contenido horizontalmente */}
       <div className="row justify-content-center">
-
         {/* "col-md-4" — ocupa 4 de 12 columnas en pantallas medianas */}
         <div className="col-md-4">
-
           {/* "mb-4" — espacio abajo del título */}
           <h2 className="mb-4">Iniciar sesión</h2>
 
@@ -89,7 +89,6 @@ function Login() {
               text-danger = texto rojo de Bootstrap
               mt-2 = espacio arriba */}
           {error && <p className="text-danger mt-2">{error}</p>}
-
         </div>
       </div>
     </div>

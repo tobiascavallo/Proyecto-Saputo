@@ -8,6 +8,9 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 // Importamos los componentes que vamos a mostrar en cada ruta
 import Login from "./componentes/Login";
 import Dashboard from "./componentes/Dashboard";
+import Camionero from "./componentes/Camionero";
+import Empleado from "./componentes/Empleado";
+import Encargado from "./componentes/Encargado";
 
 // Componente que protege rutas — actúa como un portero
 // "children" es lo que está adentro de <RutaProtegida>...</RutaProtegida>
@@ -31,16 +34,48 @@ function App() {
     <BrowserRouter>
       {/* Routes es el contenedor de todas las rutas de la app */}
       <Routes>
+        {/* Redirige la raíz al login automáticamente */}
+        <Route path="/" element={<Navigate to="/login" />} />
+
         {/* Ruta pública — cualquiera puede entrar */}
         <Route path="/login" element={<Login />} />
 
-        {/* Ruta protegida — solo entra si hay token */}
-        {/* RutaProtegida envuelve al Dashboard y lo custodia */}
+        {/* Ruta protegida general */}
         <Route
           path="/dashboard"
           element={
             <RutaProtegida>
               <Dashboard />
+            </RutaProtegida>
+          }
+        />
+
+        {/* Ruta protegida para el camionero */}
+        <Route
+          path="/camionero"
+          element={
+            <RutaProtegida>
+              <Camionero />
+            </RutaProtegida>
+          }
+        />
+
+        {/* Ruta protegida para el empleado */}
+        <Route
+          path="/empleado"
+          element={
+            <RutaProtegida>
+              <Empleado />
+            </RutaProtegida>
+          }
+        />
+
+        {/* Ruta protegida para el encargado */}
+        <Route
+          path="/encargado"
+          element={
+            <RutaProtegida>
+              <Encargado />
             </RutaProtegida>
           }
         />
