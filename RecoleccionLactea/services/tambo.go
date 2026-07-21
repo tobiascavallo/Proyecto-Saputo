@@ -25,7 +25,7 @@ type TamboService struct {
 }
 
 func NewTamboService(repo TamboRepository, repoTambero TamberoRepository, cfg config.Config) TamboService {
-	return TamboService{repo: repo, cfg: cfg}
+	return TamboService{repo: repo, cfg: cfg, repoTambero: repoTambero}
 }
 
 func (s TamboService) CrearTambo(model models.Tambo) error {
@@ -40,6 +40,12 @@ func (s TamboService) CrearTambo(model models.Tambo) error {
 	if err == nil && tamboExistente != nil {
 		return errors.New("ya existe un tambo registrado con ese número")
 	}
+	//validar que el tambero asociado exista
+	tamberoExistente, _ := s.repoTambero.ObtenerTamberoPorID(s.cfg, model.TamberoID)
+	if tamberoExistente == nil {
+		return errors.New("tambero no existe")
+	}
+
 	model.Activo = true
 	return s.repo.CrearTambo(s.cfg, model)
 }

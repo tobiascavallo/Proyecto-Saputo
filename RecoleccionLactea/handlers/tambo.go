@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -31,13 +30,13 @@ func NewTamboHandler(service TamboService) TamboHandler {
 func (h TamboHandler) CrearTambo(c *gin.Context) {
 	var req dto.CrearTamboRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "datos inválidos"})
+		c.JSON(400, gin.H{"error": "datos inválidos"})
 		return
 	}
 
 	tamberoID, err := primitive.ObjectIDFromHex(req.TamberoID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de tambero inválido"})
+		c.JSON(400, gin.H{"error": "ID de tambero inválido"})
 		return
 	}
 
@@ -47,17 +46,17 @@ func (h TamboHandler) CrearTambo(c *gin.Context) {
 	}
 
 	if err := h.service.CrearTambo(tambo); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"mensaje": "tambo creado correctamente"})
+	c.JSON(201, gin.H{"mensaje": "tambo creado correctamente"})
 }
 
 func (h TamboHandler) ObtenerTambos(c *gin.Context) {
 	tambos, err := h.service.ObtenerTambos()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "error al obtener tambos"})
+		c.JSON(500, gin.H{"error": "error al obtener tambos"})
 		return
 	}
 
@@ -66,35 +65,35 @@ func (h TamboHandler) ObtenerTambos(c *gin.Context) {
 		response = append(response, dto.TamboToResponse(t))
 	}
 
-	c.JSON(http.StatusOK, response)
+	c.JSON(200, response)
 }
 
 func (h TamboHandler) ObtenerTamboPorID(c *gin.Context) {
 	id, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(400, gin.H{"error": "ID inválido"})
 		return
 	}
 
 	tambo, err := h.service.ObtenerTamboPorID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "tambo no encontrado"})
+		c.JSON(404, gin.H{"error": "tambo no encontrado"})
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.TamboToResponse(*tambo))
+	c.JSON(200, dto.TamboToResponse(*tambo))
 }
 
 func (h TamboHandler) ObtenerTambosPorTambero(c *gin.Context) {
 	tamberoID, err := primitive.ObjectIDFromHex(c.Param("tamberoId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de tambero inválido"})
+		c.JSON(400, gin.H{"error": "ID de tambero inválido"})
 		return
 	}
 
 	tambos, err := h.service.ObtenerTambosPorTambero(tamberoID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		c.JSON(404, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -103,36 +102,36 @@ func (h TamboHandler) ObtenerTambosPorTambero(c *gin.Context) {
 		response = append(response, dto.TamboToResponse(t))
 	}
 
-	c.JSON(http.StatusOK, response)
+	c.JSON(200, response)
 }
 
 func (h TamboHandler) ObtenerTamboPorNumeroTambo(c *gin.Context) {
 	numeroStr := c.Param("numero")
 	numero, err := strconv.Atoi(numeroStr)
 	if err != nil || numero <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "número de tambo inválido"})
+		c.JSON(400, gin.H{"error": "número de tambo inválido"})
 		return
 	}
 
 	tambo, err := h.service.ObtenerTamboPorNumeroTambo(numero)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "tambo no encontrado"})
+		c.JSON(404, gin.H{"error": "tambo no encontrado"})
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.TamboToResponse(*tambo))
+	c.JSON(200, dto.TamboToResponse(*tambo))
 }
 
 func (h TamboHandler) ActualizarTambo(c *gin.Context) {
 	id, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(400, gin.H{"error": "ID inválido"})
 		return
 	}
 
 	var req dto.ActualizarTamboRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "datos inválidos"})
+		c.JSON(400, gin.H{"error": "datos inválidos"})
 		return
 	}
 
@@ -145,31 +144,31 @@ func (h TamboHandler) ActualizarTambo(c *gin.Context) {
 	if req.TamberoID != nil {
 		tamberoID, err := primitive.ObjectIDFromHex(*req.TamberoID)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "ID de tambero inválido"})
+			c.JSON(400, gin.H{"error": "ID de tambero inválido"})
 			return
 		}
 		tambo.TamberoID = tamberoID
 	}
 
 	if err := h.service.ActualizarTambo(id, tambo); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"mensaje": "tambo actualizado correctamente"})
+	c.JSON(200, gin.H{"mensaje": "tambo actualizado correctamente"})
 }
 
 func (h TamboHandler) DesactivarTambo(c *gin.Context) {
 	id, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID inválido"})
+		c.JSON(400, gin.H{"error": "ID inválido"})
 		return
 	}
 
 	if err := h.service.DesactivarTambo(id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"mensaje": "tambo desactivado correctamente"})
+	c.JSON(200, gin.H{"mensaje": "tambo desactivado correctamente"})
 }

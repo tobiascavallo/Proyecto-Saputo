@@ -13,13 +13,13 @@ import (
 type TamboRepositoryImpl struct{}
 
 func (r TamboRepositoryImpl) CrearTambo(cfg config.Config, model models.Tambo) error {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambo")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tambos")
 	_, err := collection.InsertOne(context.TODO(), model)
 	return err
 }
 
 func (r TamboRepositoryImpl) ObtenerTambos(cfg config.Config) ([]models.Tambo, error) {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambo")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tambos")
 	cursor, err := collection.Find(context.TODO(), bson.M{"activo": true})
 	if err != nil {
 		return nil, err
@@ -30,7 +30,7 @@ func (r TamboRepositoryImpl) ObtenerTambos(cfg config.Config) ([]models.Tambo, e
 }
 
 func (r TamboRepositoryImpl) ObtenerTamboPorID(cfg config.Config, id primitive.ObjectID) (*models.Tambo, error) {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambo")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tambos")
 	var tambo models.Tambo
 	err := collection.FindOne(context.TODO(), bson.M{"_id": id}).Decode(&tambo)
 	if err != nil {
@@ -40,7 +40,7 @@ func (r TamboRepositoryImpl) ObtenerTamboPorID(cfg config.Config, id primitive.O
 }
 
 func (r TamboRepositoryImpl) ObtenerTambosPorTambero(cfg config.Config, tamberoID primitive.ObjectID) ([]models.Tambo, error) {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambo")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tambos")
 
 	// Buscamos los tambos activos que pertenezcan al tamberoID provisto
 	filter := bson.M{
@@ -52,7 +52,6 @@ func (r TamboRepositoryImpl) ObtenerTambosPorTambero(cfg config.Config, tamberoI
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(context.TODO()) // Buena práctica para liberar recursos del cursor
 
 	var tambos []models.Tambo
 	if err = cursor.All(context.TODO(), &tambos); err != nil {
@@ -63,7 +62,7 @@ func (r TamboRepositoryImpl) ObtenerTambosPorTambero(cfg config.Config, tamberoI
 }
 
 func (r TamboRepositoryImpl) ObtenerTamboPorNumeroTambo(cfg config.Config, numero int) (*models.Tambo, error) {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambo")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tambos")
 	var tambo models.Tambo
 
 	// revisar si se quiere o no filtrar por campo activo
@@ -80,7 +79,7 @@ func (r TamboRepositoryImpl) ObtenerTamboPorNumeroTambo(cfg config.Config, numer
 }
 
 func (r TamboRepositoryImpl) ActualizarTambo(cfg config.Config, id primitive.ObjectID, model models.Tambo) error {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambo")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tambos")
 
 	_, err := collection.UpdateOne(
 		context.TODO(),
@@ -91,7 +90,7 @@ func (r TamboRepositoryImpl) ActualizarTambo(cfg config.Config, id primitive.Obj
 }
 
 func (r TamboRepositoryImpl) DesactivarTambo(cfg config.Config, id primitive.ObjectID) error {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambo")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tambos")
 	_, err := collection.UpdateOne(
 		context.TODO(),
 		bson.M{"_id": id},

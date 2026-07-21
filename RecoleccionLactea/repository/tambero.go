@@ -13,13 +13,13 @@ import (
 type TamberoRepositoryImpl struct{}
 
 func (r TamberoRepositoryImpl) CrearTambero(cfg config.Config, model models.Tambero) error {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambero")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tamberos")
 	_, err := collection.InsertOne(context.TODO(), model)
 	return err
 }
 
 func (r TamberoRepositoryImpl) ObtenerTamberos(cfg config.Config) ([]models.Tambero, error) {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambero")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tamberos")
 	cursor, err := collection.Find(context.TODO(), bson.M{"activo": true})
 	if err != nil {
 		return nil, err
@@ -30,7 +30,7 @@ func (r TamberoRepositoryImpl) ObtenerTamberos(cfg config.Config) ([]models.Tamb
 }
 
 func (r TamberoRepositoryImpl) ObtenerTamberoPorID(cfg config.Config, id primitive.ObjectID) (*models.Tambero, error) {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambero")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tamberos")
 	var tambero models.Tambero
 	err := collection.FindOne(context.TODO(), bson.M{"_id": id}).Decode(&tambero)
 	if err != nil {
@@ -40,7 +40,7 @@ func (r TamberoRepositoryImpl) ObtenerTamberoPorID(cfg config.Config, id primiti
 }
 
 func (r TamberoRepositoryImpl) ObtenerTamberoPorCuit(cfg config.Config, cuit string) (*models.Tambero, error) {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambero")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tamberos")
 	var tambero models.Tambero
 	err := collection.FindOne(context.TODO(), bson.M{"cuit": cuit}).Decode(&tambero)
 	if err != nil {
@@ -50,7 +50,7 @@ func (r TamberoRepositoryImpl) ObtenerTamberoPorCuit(cfg config.Config, cuit str
 }
 
 func (r TamberoRepositoryImpl) ObtenerTamberoPorEmail(cfg config.Config, email string) (*models.Tambero, error) {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambero")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tamberos")
 	var tambero models.Tambero
 	err := collection.FindOne(context.TODO(), bson.M{"email": email}).Decode(&tambero)
 	if err != nil {
@@ -60,7 +60,7 @@ func (r TamberoRepositoryImpl) ObtenerTamberoPorEmail(cfg config.Config, email s
 }
 
 func (r TamberoRepositoryImpl) ObtenerTamberoPorTelefono(cfg config.Config, telefono string) (*models.Tambero, error) {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambero")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tamberos")
 	var tambero models.Tambero
 	err := collection.FindOne(context.TODO(), bson.M{"telefono": telefono}).Decode(&tambero)
 	if err != nil {
@@ -70,7 +70,7 @@ func (r TamberoRepositoryImpl) ObtenerTamberoPorTelefono(cfg config.Config, tele
 }
 
 func (r TamberoRepositoryImpl) ActualizarTambero(cfg config.Config, id primitive.ObjectID, model models.Tambero) error {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambero")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tamberos")
 	_, err := collection.UpdateOne(
 		context.TODO(),
 		bson.M{"_id": id},
@@ -80,7 +80,7 @@ func (r TamberoRepositoryImpl) ActualizarTambero(cfg config.Config, id primitive
 }
 
 func (r TamberoRepositoryImpl) DesactivarTambero(cfg config.Config, id primitive.ObjectID) error {
-	collection := db.DB.Database(cfg.MongoDB).Collection("tambero")
+	collection := db.DB.Database(cfg.MongoDB).Collection("tamberos")
 	_, err := collection.UpdateOne(
 		context.TODO(),
 		bson.M{"_id": id},

@@ -80,7 +80,11 @@ func (h TamberoHandler) ObtenerTamberoPorID(c *gin.Context) {
 }
 
 func (h TamberoHandler) ObtenerTamberoPorEmail(c *gin.Context) {
-	email := c.Param("email")
+	email := c.Query("email")
+	if email == "" {
+		c.JSON(400, gin.H{"error": "email requerido"})
+		return
+	}
 
 	tambero, err := h.service.ObtenerTamberoPorEmail(email)
 	if err != nil {
@@ -92,7 +96,11 @@ func (h TamberoHandler) ObtenerTamberoPorEmail(c *gin.Context) {
 }
 
 func (h TamberoHandler) ObtenerTamberoPorCuit(c *gin.Context) {
-	cuit := c.Param("cuit")
+	cuit := c.Query("cuit")
+	if cuit == "" {
+		c.JSON(400, gin.H{"error": "cuit requerido"})
+		return
+	}
 
 	tambero, err := h.service.ObtenerTamberoPorCuit(cuit)
 	if err != nil {
@@ -104,7 +112,11 @@ func (h TamberoHandler) ObtenerTamberoPorCuit(c *gin.Context) {
 }
 
 func (h TamberoHandler) ObtenerTamberoPorTelefono(c *gin.Context) {
-	telefono := c.Param("telefono")
+	telefono := c.Query("telefono")
+	if telefono == "" {
+		c.JSON(400, gin.H{"error": "teléfono requerido"})
+		return
+	}
 
 	tambero, err := h.service.ObtenerTamberoPorTelefono(telefono)
 	if err != nil {

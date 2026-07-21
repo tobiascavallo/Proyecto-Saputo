@@ -47,6 +47,24 @@ func (s TamberoService) CrearTambero(model models.Tambero) error {
 	if err := utils.ValidarEmail(model.Email); err != nil {
 		return err
 	}
+	//valido cuit con modulo 11
+	valido, err := utils.ValidarCuitPersona(model.Cuit)
+	if err != nil {
+		return err
+	}
+	if !valido {
+		return fmt.Errorf("el CUIT del tambero no es válido")
+	}
+	// Verificar que el CUIT no esté duplicado
+	tamberoExistenteCuit, _ := s.repo.ObtenerTamberoPorCuit(s.cfg, model.Cuit)
+	if tamberoExistenteCuit != nil {
+		return errors.New("el CUIT ya está registrado")
+	}
+	// Verificar que el teléfono no esté duplicado
+	tamberoExistenteTel, _ := s.repo.ObtenerTamberoPorTelefono(s.cfg, model.Telefono)
+	if tamberoExistenteTel != nil {
+		return errors.New("el teléfono ya está registrado")
+	}
 	// Verificar que el email no esté registrado
 	tamberoExistente, _ := s.repo.ObtenerTamberoPorEmail(s.cfg, model.Email)
 	if tamberoExistente != nil {
@@ -79,7 +97,7 @@ func (s TamberoService) ObtenerTamberoPorEmail(email string) (*models.Tambero, e
 
 func (s TamberoService) ObtenerTamberoPorTelefono(telefono string) (*models.Tambero, error) {
 	if strings.TrimSpace(telefono) == "" {
-		return nil, errors.New("email invalido")
+		return nil, errors.New("telefono invalido")
 	}
 	return s.repo.ObtenerTamberoPorTelefono(s.cfg, telefono)
 }
@@ -107,15 +125,37 @@ func (s TamberoService) ActualizarTambero(id primitive.ObjectID, model models.Ta
 	if strings.TrimSpace(model.Nombre) != "" {
 		tamberoExistente.Nombre = model.Nombre
 	}
+
 	if strings.TrimSpace(model.Cuit) != "" {
+		valido, err := utils.ValidarCuitPersona(model.Cuit)
+		if err != nil {
+			return err
+		}
+		if !valido {
+			return fmt.Errorf("el CUIT del tambero no es válido")
+		}
+		existente, _ := s.repo.ObtenerTamberoPorCuit(s.cfg, model.Cuit)
+		if existente != nil && existente.ID != id {
+			return errors.New("el CUIT ya está registrado")
+		}
 		tamberoExistente.Cuit = model.Cuit
 	}
+
 	if strings.TrimSpace(model.Telefono) != "" {
+		existente, _ := s.repo.ObtenerTamberoPorTelefono(s.cfg, model.Telefono)
+		if existente != nil && existente.ID != id {
+			return errors.New("el teléfono ya está registrado")
+		}
 		tamberoExistente.Telefono = model.Telefono
 	}
+
 	if strings.TrimSpace(model.Email) != "" {
 		if err := utils.ValidarEmail(model.Email); err != nil {
 			return err
+		}
+		existente, _ := s.repo.ObtenerTamberoPorEmail(s.cfg, model.Email)
+		if existente != nil && existente.ID != id {
+			return errors.New("el email ya está registrado")
 		}
 		tamberoExistente.Email = model.Email
 	}
