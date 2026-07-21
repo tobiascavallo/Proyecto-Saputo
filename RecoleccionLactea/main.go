@@ -109,5 +109,21 @@ func main() {
 		tambero.DELETE("/:id", middleware.RequiereRol("encargado"), tamberoHandler.DesactivarTambero)
 	}
 
+	tamboRepo := repository.TamboRepositoryImpl{}
+	tamboService := services.NewTamboService(tamboRepo, tamberoRepo, cfg)
+	tamboHandler := handlers.NewTamboHandler(tamboService)
+
+	tambo := r.Group("/api/v1/tambo")
+	tambo.Use(middleware.AuthMiddleware())
+	{
+		tambo.POST("", middleware.RequiereRol("encargado"), tamboHandler.CrearTambo)
+		tambo.GET("", tamboHandler.ObtenerTambos)
+		tambo.GET("/:id", tamboHandler.ObtenerTamboPorID)
+		tambo.GET("/numero/:numero", tamboHandler.ObtenerTamboPorNumeroTambo)
+		tambo.GET("/tambero/:tamberoId", tamboHandler.ObtenerTambosPorTambero)
+		tambo.PATCH("/:id", middleware.RequiereRol("encargado"), tamboHandler.ActualizarTambo)
+		tambo.DELETE("/:id", middleware.RequiereRol("encargado"), tamboHandler.DesactivarTambo)
+	}
+
 	r.Run(":" + cfg.Port)
 }
