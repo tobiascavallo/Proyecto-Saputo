@@ -35,7 +35,7 @@ func (s UsuarioService) CrearUsuario(model models.Usuario) error {
 		return errors.New("rol inválido")
 	}
 
-	if err := validarEmail(model.Email); err != nil {
+	if err := utils.ValidarEmail(model.Email); err != nil {
 		return err
 	}
 
@@ -165,14 +165,5 @@ func validarContraseña(contraseña string) error {
 		return errors.New("la contraseña debe tener al menos un carácter especial (!@#$%^&*)")
 	}
 
-	return nil
-}
-
-// validarEmail verifica que el email tenga un formato válido.
-func validarEmail(email string) error {
-	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
-	if !emailRegex.MatchString(email) {
-		return errors.New("formato de email inválido")
-	}
 	return nil
 }
