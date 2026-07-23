@@ -15,6 +15,7 @@ type Remito struct {
 	VehiculoID             primitive.ObjectID   `bson:"vehiculo_id"`
 	AcopladoID             primitive.ObjectID   `bson:"acoplado_id,omitempty"`
 	EstadoSincronizacion   EstadoSincronizacion `bson:"estado_sincronizacion"`
+	EstadoRemito           EstadoRemito         `bson:"estado_remito"`
 	EmpresaTransportistaID primitive.ObjectID   `bson:"empresa_transportista_id"`
 	CreadoOffline          bool                 `bson:"creado_offline"`
 }
@@ -24,4 +25,11 @@ type EstadoSincronizacion string
 const (
 	EstadoPendiente    EstadoSincronizacion = "pendiente"
 	EstadoSincronizado EstadoSincronizacion = "sincronizado"
+)
+
+type EstadoRemito string
+
+const (
+	EstadoRemitoEnCurso    EstadoRemito = "en_curso"
+	EstadoRemitoFinalizado EstadoRemito = "finalizado"
 )

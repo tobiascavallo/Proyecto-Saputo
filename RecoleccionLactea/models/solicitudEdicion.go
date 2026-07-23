@@ -9,6 +9,7 @@ import (
 type SolicitudEdicion struct {
 	ID                 primitive.ObjectID `bson:"_id,omitempty"`
 	LineaRecoleccionID primitive.ObjectID `bson:"linea_recoleccion_id"`
+	CamioneroID        primitive.ObjectID `bson:"camionero_id"`
 	ValorActual        ValorRecoleccion   `bson:"valor_actual"`
 	ValorPropuesto     ValorRecoleccion   `bson:"valor_propuesto"`
 	Motivo             string             `bson:"motivo"`

@@ -125,5 +125,53 @@ func main() {
 		tambo.DELETE("/:id", middleware.RequiereRol("encargado"), tamboHandler.DesactivarTambo)
 	}
 
+	remitoRepo := repository.RemitoRepositoryImpl{}
+	remitoService := services.NewRemitoService(remitoRepo, vehiculoRepo, acopladoRepo, empresaRepo, cfg)
+	remitoHandler := handlers.NewRemitoHandler(remitoService)
+
+	remito := r.Group("/api/v1/remito")
+	remito.Use(middleware.AuthMiddleware())
+	{
+		{
+			remito.POST("", middleware.RequiereRol("camionero"), remitoHandler.CrearRemito)
+			remito.GET("", remitoHandler.ObtenerRemitos)
+			remito.GET("/estado", middleware.RequiereRol("camionero"), remitoHandler.ObtenerRemitosPorEstado)
+			remito.GET("/:id", remitoHandler.ObtenerRemitoPorID)
+			remito.PATCH("/:id/finalizar", middleware.RequiereRol("camionero"), remitoHandler.FinalizarRemito)
+			remito.PATCH("/:id/sincronizar", remitoHandler.SincronizarRemito)
+		}
+	}
+
+	lineaRepo := repository.LineaRecoleccionRepositoryImpl{}
+
+	solicitudRepo := repository.SolicitudEdicionRepositoryImpl{}
+	solicitudService := services.NewSolicitudEdicionService(solicitudRepo, lineaRepo, remitoRepo, cfg)
+	solicitudHandler := handlers.NewSolicitudEdicionHandler(solicitudService)
+
+	solicitud := r.Group("/api/v1/solicitudEdicion")
+	solicitud.Use(middleware.AuthMiddleware())
+	{
+		solicitud.POST("", middleware.RequiereRol("camionero"), solicitudHandler.CrearSolicitud)
+		solicitud.GET("", solicitudHandler.ObtenerSolicitudes)
+		solicitud.GET("/:id", solicitudHandler.ObtenerSolicitudPorID)
+		solicitud.PATCH("/:id/decision", middleware.RequiereRol("encargado"), solicitudHandler.TomarDecision)
+	}
+
+	lineaService := services.NewLineaRecoleccionService(lineaRepo, remitoRepo, tamboRepo, solicitudRepo, cfg)
+	lineaHandler := handlers.NewLineaRecoleccionHandler(lineaService)
+
+	linea := r.Group("/api/v1/lineaRecoleccion")
+	linea.Use(middleware.AuthMiddleware())
+	{
+		linea.POST("", middleware.RequiereRol("camionero"), lineaHandler.CrearLineaRecoleccion)
+		linea.GET("", lineaHandler.ObtenerLineas)
+		linea.GET("/:id", lineaHandler.ObtenerLineaPorID)
+		linea.GET("/remito/:remitoId", lineaHandler.ObtenerLineasPorRemito)
+		linea.GET("/tambo/:tamboId", lineaHandler.ObtenerLineasPorTambo)
+		linea.GET("/cisterna/:remitoId", lineaHandler.ObtenerLineasPorCisterna)
+		linea.GET("/codigo", lineaHandler.ObtenerLineaPorCodigoMuestra)
+		linea.PUT("/:id", middleware.RequiereRol("camionero"), lineaHandler.ActualizarLineaRecoleccion)
+	}
+
 	r.Run(":" + cfg.Port)
 }
