@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { fetchConToken } from "../api";
 
 function AltaUsuario() {
   const [form, setForm] = useState({
     nombre: "",
     apellido: "",
     email: "",
-    password: "",
+    contrasena: "",
     rol: "",
   });
 
@@ -14,14 +15,16 @@ function AltaUsuario() {
 
   async function handleSubmit() {
     try {
-      const response = await fetch("http://localhost:8080/api/usuarios", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+      const response = await fetchConToken(
+        "http://localhost:8080/api/v1/usuario",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(form),
         },
-        body: JSON.stringify(form),
-      });
+      );
 
       if (!response.ok) {
         setError("Error al crear el usuario");
@@ -29,7 +32,7 @@ function AltaUsuario() {
       }
 
       setExito("Usuario creado correctamente");
-      setForm({ nombre: "", apellido: "", email: "", password: "", rol: "" });
+      setForm({ nombre: "", apellido: "", email: "", contrasena: "", rol: "" });
     } catch (error) {
       setError("Error al conectar con el servidor");
     }
@@ -65,8 +68,8 @@ function AltaUsuario() {
           <input
             type="password"
             placeholder="Contraseña"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            value={form.contrasena}
+            onChange={(e) => setForm({ ...form, contrasena: e.target.value })}
             className="form-control mb-3"
           />
           <select

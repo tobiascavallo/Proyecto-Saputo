@@ -7,8 +7,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 // Importamos los componentes que vamos a mostrar en cada ruta
 import Login from "./componentes/Login";
-import Dashboard from "./componentes/Dashboard";
-import Camionero from "./componentes/Camionero";
 import Empleado from "./componentes/Empleado";
 import Encargado from "./componentes/Encargado";
 
@@ -39,26 +37,6 @@ function App() {
 
         {/* Ruta pública — cualquiera puede entrar */}
         <Route path="/login" element={<Login />} />
-
-        {/* Ruta protegida general */}
-        <Route
-          path="/dashboard"
-          element={
-            <RutaProtegida>
-              <Dashboard />
-            </RutaProtegida>
-          }
-        />
-
-        {/* Ruta protegida para el camionero */}
-        <Route
-          path="/camionero"
-          element={
-            <RutaProtegida>
-              <Camionero />
-            </RutaProtegida>
-          }
-        />
 
         {/* Ruta protegida para el empleado */}
         <Route

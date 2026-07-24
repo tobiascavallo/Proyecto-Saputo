@@ -2,6 +2,7 @@
 // useNavigate nos permite navegar entre rutas desde el código
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
 
 function Login() {
   // Variable reactiva para el email — arranca vacía
@@ -20,30 +21,34 @@ function Login() {
   // "async" porque hace una llamada a la API que tarda un tiempo
   async function handleLogin() {
     try {
-      // Llama a la API del backend en Go
-      // "await" pausa acá hasta que el servidor responda
-      const response = await fetch("http://localhost:8080/api/login", {
-        method: "POST", // tipo de llamada HTTP
-        headers: { "Content-Type": "application/json" }, // le dice al servidor que mandamos JSON
-        body: JSON.stringify({ email, password }), // convierte los datos a JSON y los manda
+      const response = await fetch("http://localhost:8080/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
 
-      // Convierte la respuesta del servidor a un objeto JavaScript
-      // "await" porque esto también tarda un momento
+      if (!response.ok) {
+        setError("Email o contraseña incorrectos");
+        return;
+      }
+
       const data = await response.json();
 
-      // Guarda el token JWT en el navegador para usarlo en futuras llamadas
+      // El backend devuelve "token", no "access_token"
       localStorage.setItem("token", data.token);
+      localStorage.setItem("refresh_token", data.refresh_token);
 
-      if (data.rol === "camionero") {
+      // El login no manda el rol directo — hay que sacarlo de adentro del JWT
+      const payload: any = jwtDecode(data.token);
+
+      if (payload.rol === "camionero") {
         navigate("/camionero");
-      } else if (data.rol === "empleado") {
+      } else if (payload.rol === "empleado") {
         navigate("/empleado");
-      } else if (data.rol === "encargado") {
+      } else if (payload.rol === "encargado") {
         navigate("/encargado");
       }
     } catch (error) {
-      // Si algo salió mal (ej: no hay conexión), muestra el error en pantalla
       setError("Error al conectar con el servidor");
     }
   }

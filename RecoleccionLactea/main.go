@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/tobiascavallo/RecoleccionLactea/config"
 	"github.com/tobiascavallo/RecoleccionLactea/db"
@@ -13,7 +14,6 @@ import (
 )
 
 func main() {
-
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -25,6 +25,12 @@ func main() {
 	}
 
 	r := gin.Default()
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins: []string{"http://localhost:5173"},
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE"},
+		AllowHeaders: []string{"Origin", "Content-Type", "Authorization"},
+	}))
 
 	usuarioRepo := repository.UsuarioRepositoryImpl{}
 	authRepo := repository.AuthRepositoryImpl{}

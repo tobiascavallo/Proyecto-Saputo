@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
+import { fetchConToken } from "../api";
 
 function SolicitudesEdicion() {
-  const [solicitudes, setSolicitudes] = useState([]);
+  const [solicitudes, setSolicitudes] = useState<any[]>([]);
   const [solicitudSeleccionada, setSolicitudSeleccionada] = useState<any>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -9,11 +10,9 @@ function SolicitudesEdicion() {
   useEffect(() => {
     async function fetchSolicitudes() {
       try {
-        const response = await fetch("http://localhost:8080/api/solicitudes", {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
+        const response = await fetchConToken(
+          "http://localhost:8080/api/v1/solicitudEdicion",
+        );
 
         if (!response.ok) {
           setError("Error al obtener las solicitudes");
@@ -32,31 +31,19 @@ function SolicitudesEdicion() {
     fetchSolicitudes();
   }, []);
 
-  async function handleAprobar(id: string) {
+  async function tomarDecision(id: string, decision: "aprobada" | "rechazada") {
     try {
-      await fetch(`http://localhost:8080/api/solicitudes/${id}/aprobar`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+      await fetchConToken(
+        `http://localhost:8080/api/v1/solicitudEdicion/${id}/decision`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ decision }),
         },
-      });
+      );
       setSolicitudSeleccionada(null);
     } catch (error) {
-      setError("Error al aprobar la solicitud");
-    }
-  }
-
-  async function handleRechazar(id: string) {
-    try {
-      await fetch(`http://localhost:8080/api/solicitudes/${id}/rechazar`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      setSolicitudSeleccionada(null);
-    } catch (error) {
-      setError("Error al rechazar la solicitud");
+      setError("Error al procesar la decisión");
     }
   }
 
@@ -72,9 +59,9 @@ function SolicitudesEdicion() {
         <table className="table table-striped table-hover">
           <thead className="table-dark">
             <tr>
-              <th>Camionero</th>
-              <th>Tambo</th>
-              <th>Fecha</th>
+              <th>Camionero ID</th>
+              <th>Línea de recolección</th>
+              <th>Motivo</th>
               <th>Estado</th>
               <th>Acciones</th>
             </tr>
@@ -82,11 +69,19 @@ function SolicitudesEdicion() {
           <tbody>
             {solicitudes.map((s: any) => (
               <tr key={s.id}>
-                <td>{s.camionero}</td>
-                <td>{s.tambo}</td>
-                <td>{s.fecha}</td>
+                <td>{s.camionero_id}</td>
+                <td>{s.linea_recoleccion_id}</td>
+                <td>{s.motivo}</td>
                 <td>
-                  <span className="badge bg-warning">Pendiente</span>
+                  {s.estado === "pendiente" && (
+                    <span className="badge bg-warning">Pendiente</span>
+                  )}
+                  {s.estado === "aprobada" && (
+                    <span className="badge bg-success">Aprobada</span>
+                  )}
+                  {s.estado === "rechazada" && (
+                    <span className="badge bg-danger">Rechazada</span>
+                  )}
                 </td>
                 <td>
                   <button
@@ -107,32 +102,60 @@ function SolicitudesEdicion() {
         <div className="card p-4">
           <h5 className="mb-3">Detalle de solicitud</h5>
           <p>
-            <strong>Camionero:</strong> {solicitudSeleccionada.camionero}
-          </p>
-          <p>
-            <strong>Tambo:</strong> {solicitudSeleccionada.tambo}
+            <strong>Camionero ID:</strong> {solicitudSeleccionada.camionero_id}
           </p>
           <p>
             <strong>Motivo:</strong> {solicitudSeleccionada.motivo}
           </p>
-          <p>
-            <strong>Valor actual:</strong> {solicitudSeleccionada.valor_actual}
-          </p>
-          <p>
-            <strong>Valor propuesto:</strong>{" "}
-            {solicitudSeleccionada.valor_propuesto}
-          </p>
+
+          <div className="row mt-3">
+            <div className="col-md-6">
+              <h6>Valor actual</h6>
+              <p>
+                Litros: {solicitudSeleccionada.valor_actual.litros_recibidos}
+              </p>
+              <p>
+                Temperatura:{" "}
+                {solicitudSeleccionada.valor_actual.temperatura_celcius}°C
+              </p>
+              <p>
+                Cisterna: {solicitudSeleccionada.valor_actual.numero_cisterna}
+              </p>
+              <p>Hora: {solicitudSeleccionada.valor_actual.hora_recoleccion}</p>
+            </div>
+            <div className="col-md-6">
+              <h6>Valor propuesto</h6>
+              <p>
+                Litros: {solicitudSeleccionada.valor_propuesto.litros_recibidos}
+              </p>
+              <p>
+                Temperatura:{" "}
+                {solicitudSeleccionada.valor_propuesto.temperatura_celcius}°C
+              </p>
+              <p>
+                Cisterna:{" "}
+                {solicitudSeleccionada.valor_propuesto.numero_cisterna}
+              </p>
+              <p>
+                Hora: {solicitudSeleccionada.valor_propuesto.hora_recoleccion}
+              </p>
+            </div>
+          </div>
 
           <div className="d-flex gap-2 mt-3">
             <button
               className="btn btn-success"
-              onClick={() => handleAprobar(solicitudSeleccionada.id)}
+              onClick={() =>
+                tomarDecision(solicitudSeleccionada.id, "aprobada")
+              }
             >
               Aprobar
             </button>
             <button
               className="btn btn-danger"
-              onClick={() => handleRechazar(solicitudSeleccionada.id)}
+              onClick={() =>
+                tomarDecision(solicitudSeleccionada.id, "rechazada")
+              }
             >
               Rechazar
             </button>
