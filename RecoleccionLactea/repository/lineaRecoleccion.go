@@ -56,10 +56,31 @@ func (r LineaRecoleccionRepositoryImpl) ObtenerLineaPorCodigoMuestra(cfg config.
 
 func (r LineaRecoleccionRepositoryImpl) ActualizarLineaRecoleccion(cfg config.Config, id primitive.ObjectID, model models.LineaRecoleccion) error {
 	collection := db.DB.Database(cfg.MongoDB).Collection("lineas_recoleccion")
+
+	update := bson.M{}
+	if model.LitrosRecibidos != 0 {
+		update["litros_recibidos"] = model.LitrosRecibidos
+	}
+	if model.TemperaturaCelcius != 0 {
+		update["temperatura_celcius"] = model.TemperaturaCelcius
+	}
+	if model.NumeroCisterna != 0 {
+		update["numero_cisterna"] = model.NumeroCisterna
+	}
+	if !model.HoraRecoleccion.IsZero() {
+		update["hora_recoleccion"] = model.HoraRecoleccion
+	}
+	if model.CodigoMuestraDiaria != "" {
+		update["codigo_muestra_diaria"] = model.CodigoMuestraDiaria
+	}
+	if model.CodigoMuestraUFC != "" {
+		update["codigo_muestra_ufc"] = model.CodigoMuestraUFC
+	}
+
 	_, err := collection.UpdateOne(
 		context.TODO(),
 		bson.M{"_id": id},
-		bson.M{"$set": model},
+		bson.M{"$set": update},
 	)
 	return err
 }

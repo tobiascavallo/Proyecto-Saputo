@@ -173,5 +173,19 @@ func main() {
 		linea.PUT("/:id", middleware.RequiereRol("camionero"), lineaHandler.ActualizarLineaRecoleccion)
 	}
 
+	resultadoAnalisisRepo := repository.ResultadoAnalisisRepositoryImpl{}
+	resultadoSAPRepo := repository.ResultadoSAPRepositoryImpl{}
+	resultadoAnalisisService := services.NewResultadoAnalisisService(resultadoAnalisisRepo, resultadoSAPRepo, lineaRepo, cfg)
+	resultadoAnalisisHandler := handlers.NewResultadoAnalisisHandler(resultadoAnalisisService)
+
+	resultado := r.Group("/api/v1/resultadoAnalisis")
+	resultado.Use(middleware.AuthMiddleware())
+	{
+		resultado.POST("/consultarSAP", middleware.RequiereRol("encargado"), resultadoAnalisisHandler.ObtenerResultadoDesdeSAP)
+		resultado.GET("", resultadoAnalisisHandler.ObtenerResultados)
+		resultado.GET("/:id", resultadoAnalisisHandler.ObtenerResultadoPorID)
+		resultado.GET("/linea/:lineaId", resultadoAnalisisHandler.ObtenerResultadosPorLinea)
+		resultado.PUT("/:id", middleware.RequiereRol("encargado"), resultadoAnalisisHandler.ActualizarResultado)
+	}
 	r.Run(":" + cfg.Port)
 }

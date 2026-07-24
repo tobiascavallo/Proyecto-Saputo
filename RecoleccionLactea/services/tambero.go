@@ -35,9 +35,7 @@ func (s TamberoService) CrearTambero(model models.Tambero) error {
 	if strings.TrimSpace(model.Nombre) == "" {
 		return fmt.Errorf("nombre de tambero invalido")
 	}
-	if strings.TrimSpace(model.Cuit) == "" {
-		return fmt.Errorf("cuit invalido")
-	}
+
 	if strings.TrimSpace(model.Telefono) == "" {
 		return fmt.Errorf("telefono invalido")
 	}
@@ -47,19 +45,7 @@ func (s TamberoService) CrearTambero(model models.Tambero) error {
 	if err := utils.ValidarEmail(model.Email); err != nil {
 		return err
 	}
-	//valido cuit con modulo 11
-	valido, err := utils.ValidarCuitPersona(model.Cuit)
-	if err != nil {
-		return err
-	}
-	if !valido {
-		return fmt.Errorf("el CUIT del tambero no es válido")
-	}
-	// Verificar que el CUIT no esté duplicado
-	tamberoExistenteCuit, _ := s.repo.ObtenerTamberoPorCuit(s.cfg, model.Cuit)
-	if tamberoExistenteCuit != nil {
-		return errors.New("el CUIT ya está registrado")
-	}
+
 	// Verificar que el teléfono no esté duplicado
 	tamberoExistenteTel, _ := s.repo.ObtenerTamberoPorTelefono(s.cfg, model.Telefono)
 	if tamberoExistenteTel != nil {
