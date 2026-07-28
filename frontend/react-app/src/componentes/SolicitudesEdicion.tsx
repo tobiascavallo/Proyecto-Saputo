@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchConToken } from "../api";
+import { API_URL, fetchConToken } from "../api";
 
 function SolicitudesEdicion() {
   const [solicitudes, setSolicitudes] = useState<any[]>([]);
@@ -11,7 +11,7 @@ function SolicitudesEdicion() {
     async function fetchSolicitudes() {
       try {
         const response = await fetchConToken(
-          "http://localhost:8080/api/v1/solicitudEdicion",
+          `${API_URL}/api/v1/solicitudEdicion`,
         );
 
         if (!response.ok) {
@@ -33,15 +33,34 @@ function SolicitudesEdicion() {
 
   async function tomarDecision(id: string, decision: "aprobada" | "rechazada") {
     try {
-      await fetchConToken(
-        `http://localhost:8080/api/v1/solicitudEdicion/${id}/decision`,
+      const response = await fetchConToken(
+        `${API_URL}/api/v1/solicitudEdicion/${id}/decision`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ decision }),
         },
       );
-      setSolicitudSeleccionada(null);
+
+      if (!response.ok) {
+        setError(
+          "El servidor rechazó la decisión — la solicitud puede haber cambiado de estado",
+        );
+        return;
+      }
+
+      // Solo actualizamos el frontend si el backend confirmó el cambio
+      setSolicitudes((solicitudesActuales) =>
+        solicitudesActuales.map((s) =>
+          s.id === id ? { ...s, estado: decision } : s,
+        ),
+      );
+
+      // También actualizamos la solicitud seleccionada, así el detalle
+      // refleja el nuevo estado sin tener que volver a la lista
+      setSolicitudSeleccionada((actual: any) =>
+        actual ? { ...actual, estado: decision } : actual,
+      );
     } catch (error) {
       setError("Error al procesar la decisión");
     }
@@ -143,22 +162,34 @@ function SolicitudesEdicion() {
           </div>
 
           <div className="d-flex gap-2 mt-3">
-            <button
-              className="btn btn-success"
-              onClick={() =>
-                tomarDecision(solicitudSeleccionada.id, "aprobada")
-              }
-            >
-              Aprobar
-            </button>
-            <button
-              className="btn btn-danger"
-              onClick={() =>
-                tomarDecision(solicitudSeleccionada.id, "rechazada")
-              }
-            >
-              Rechazar
-            </button>
+            {solicitudSeleccionada.estado === "pendiente" ? (
+              <>
+                <button
+                  className="btn btn-success"
+                  onClick={() =>
+                    tomarDecision(solicitudSeleccionada.id, "aprobada")
+                  }
+                >
+                  Aprobar
+                </button>
+                <button
+                  className="btn btn-danger"
+                  onClick={() =>
+                    tomarDecision(solicitudSeleccionada.id, "rechazada")
+                  }
+                >
+                  Rechazar
+                </button>
+              </>
+            ) : (
+              <p className="text-muted mb-0 align-self-center">
+                Esta solicitud ya fue{" "}
+                {solicitudSeleccionada.estado === "aprobada"
+                  ? "aprobada"
+                  : "rechazada"}
+                .
+              </p>
+            )}
             <button
               className="btn btn-secondary"
               onClick={() => setSolicitudSeleccionada(null)}

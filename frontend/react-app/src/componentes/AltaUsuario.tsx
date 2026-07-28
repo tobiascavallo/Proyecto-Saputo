@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fetchConToken } from "../api";
+import { API_URL, fetchConToken } from "../api";
 
 function AltaUsuario() {
   const [form, setForm] = useState({
@@ -15,16 +15,13 @@ function AltaUsuario() {
 
   async function handleSubmit() {
     try {
-      const response = await fetchConToken(
-        "http://localhost:8080/api/v1/usuario",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(form),
+      const response = await fetchConToken(`${API_URL}/api/v1/usuario`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify(form),
+      });
 
       if (!response.ok) {
         setError("Error al crear el usuario");

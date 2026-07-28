@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
+import { API_URL } from "../api";
 
 function Login() {
   // Variable reactiva para el email — arranca vacía
@@ -21,10 +22,10 @@ function Login() {
   // "async" porque hace una llamada a la API que tarda un tiempo
   async function handleLogin() {
     try {
-      const response = await fetch("http://localhost:8080/api/v1/auth/login", {
+      const response = await fetch(`${API_URL}/api/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, contrasena: password }),
       });
 
       if (!response.ok) {

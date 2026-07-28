@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { API_URL } from "../api";
 
 function Navbar({ titulo }: { titulo: string }) {
   const navigate = useNavigate();
@@ -7,7 +8,7 @@ function Navbar({ titulo }: { titulo: string }) {
     const refreshToken = localStorage.getItem("refresh_token");
 
     try {
-      await fetch("http://localhost:8080/api/v1/auth/logout", {
+      await fetch(`${API_URL}/api/v1/auth/logout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh_token: refreshToken }),

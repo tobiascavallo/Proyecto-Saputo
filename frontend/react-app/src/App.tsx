@@ -4,6 +4,8 @@
 // Route: define una ruta específica
 // Navigate: redirige al usuario a otra ruta
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
+import { useEffect } from "react";
 
 // Importamos los componentes que vamos a mostrar en cada ruta
 import Login from "./componentes/Login";
@@ -12,17 +14,35 @@ import Encargado from "./componentes/Encargado";
 
 // Componente que protege rutas — actúa como un portero
 // "children" es lo que está adentro de <RutaProtegida>...</RutaProtegida>
-function RutaProtegida({ children }: { children: React.ReactNode }) {
-  // Busca el token JWT en el navegador
+function RutaProtegida({
+  children,
+  rolesPermitidos,
+}: {
+  children: React.ReactNode;
+  rolesPermitidos: string[];
+}) {
   const token = localStorage.getItem("token");
 
-  // Si no hay token, el usuario no está logueado
-  // Lo mandamos de vuelta al login
   if (!token) {
     return <Navigate to="/login" />;
   }
 
-  // Si hay token, mostramos lo que estaba adentro de <RutaProtegida>
+  const payload: any = jwtDecode(token);
+
+  if (!rolesPermitidos.includes(payload.rol)) {
+    return <Navigate to="/login" />;
+  }
+  useEffect(() => {
+    function manejarPageshow(event: PageTransitionEvent) {
+      if (event.persisted) {
+        window.location.reload();
+      }
+    }
+
+    window.addEventListener("pageshow", manejarPageshow);
+    return () => window.removeEventListener("pageshow", manejarPageshow);
+  }, []);
+
   return children;
 }
 
@@ -42,7 +62,7 @@ function App() {
         <Route
           path="/empleado"
           element={
-            <RutaProtegida>
+            <RutaProtegida rolesPermitidos={["empleado"]}>
               <Empleado />
             </RutaProtegida>
           }
@@ -52,7 +72,7 @@ function App() {
         <Route
           path="/encargado"
           element={
-            <RutaProtegida>
+            <RutaProtegida rolesPermitidos={["encargado"]}>
               <Encargado />
             </RutaProtegida>
           }

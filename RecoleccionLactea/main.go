@@ -28,7 +28,7 @@ func main() {
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"http://localhost:5173"},
-		AllowMethods: []string{"GET", "POST", "PUT", "DELETE"},
+		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
 		AllowHeaders: []string{"Origin", "Content-Type", "Authorization"},
 	}))
 
@@ -130,9 +130,10 @@ func main() {
 		tambo.PATCH("/:id", middleware.RequiereRol("encargado"), tamboHandler.ActualizarTambo)
 		tambo.DELETE("/:id", middleware.RequiereRol("encargado"), tamboHandler.DesactivarTambo)
 	}
+	lineaRepo := repository.LineaRecoleccionRepositoryImpl{}
 
 	remitoRepo := repository.RemitoRepositoryImpl{}
-	remitoService := services.NewRemitoService(remitoRepo, vehiculoRepo, acopladoRepo, empresaRepo, cfg)
+	remitoService := services.NewRemitoService(remitoRepo, vehiculoRepo, acopladoRepo, empresaRepo, cfg, lineaRepo)
 	remitoHandler := handlers.NewRemitoHandler(remitoService)
 
 	remito := r.Group("/api/v1/remito")
@@ -147,8 +148,6 @@ func main() {
 			remito.PATCH("/:id/sincronizar", remitoHandler.SincronizarRemito)
 		}
 	}
-
-	lineaRepo := repository.LineaRecoleccionRepositoryImpl{}
 
 	solicitudRepo := repository.SolicitudEdicionRepositoryImpl{}
 	solicitudService := services.NewSolicitudEdicionService(solicitudRepo, lineaRepo, remitoRepo, cfg)
@@ -193,5 +192,6 @@ func main() {
 		resultado.GET("/linea/:lineaId", resultadoAnalisisHandler.ObtenerResultadosPorLinea)
 		resultado.PUT("/:id", middleware.RequiereRol("encargado"), resultadoAnalisisHandler.ActualizarResultado)
 	}
+
 	r.Run(":" + cfg.Port)
 }

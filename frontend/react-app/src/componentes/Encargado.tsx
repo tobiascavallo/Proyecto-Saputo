@@ -15,8 +15,7 @@ function Encargado() {
         <div className="row">
           {/* Menú lateral */}
           <div className="col-md-2 bg-dark min-vh-100 p-3">
-            <h5 className="text-white mb-4">Panel Encargado</h5>
-            <ul className="list-unstyled">
+            <ul className="list-unstyled mt-2">
               <li
                 className="text-white mb-2"
                 style={{ cursor: "pointer" }}

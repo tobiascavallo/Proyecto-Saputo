@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchConToken } from "../api";
+import { API_URL, fetchConToken } from "../api";
 
 function Remitos() {
   const [remitos, setRemitos] = useState<any[]>([]);
@@ -15,9 +15,7 @@ function Remitos() {
   useEffect(() => {
     async function fetchRemitos() {
       try {
-        const response = await fetchConToken(
-          "http://localhost:8080/api/v1/remito",
-        );
+        const response = await fetchConToken(`${API_URL}/api/v1/remito`);
 
         if (!response.ok) {
           setError("Error al obtener los remitos");
@@ -25,7 +23,7 @@ function Remitos() {
         }
 
         const data = await response.json();
-        setRemitos(data);
+        setRemitos(data || []);
       } catch (error) {
         setError("Error al conectar con el servidor");
       } finally {
@@ -44,18 +42,19 @@ function Remitos() {
     try {
       // Trae las líneas de recolección de ese remito
       const responseLineas = await fetchConToken(
-        `http://localhost:8080/api/v1/lineaRecoleccion/remito/${remito.id}`,
+        `${API_URL}/api/v1/lineaRecoleccion/remito/${remito.id}`,
       );
       const dataLineas = await responseLineas.json();
-      setLineasDelRemito(dataLineas);
+      // El backend devuelve null (no []) si no hay líneas todavía
+      setLineasDelRemito(dataLineas || []);
 
       // Trae los resultados de análisis de todo el sistema
       // (después los cruzamos por linea_recoleccion_id)
       const responseResultados = await fetchConToken(
-        "http://localhost:8080/api/v1/resultadoAnalisis",
+        `${API_URL}/api/v1/resultadoAnalisis`,
       );
       const dataResultados = await responseResultados.json();
-      setResultados(dataResultados);
+      setResultados(dataResultados || []);
     } catch (error) {
       setError("Error al obtener el detalle del remito");
     } finally {
@@ -140,6 +139,10 @@ function Remitos() {
 
           {cargandoDetalle ? (
             <p>Cargando líneas de recolección...</p>
+          ) : lineasDelRemito.length === 0 ? (
+            <p className="text-muted">
+              Este remito todavía no tiene líneas de recolección cargadas.
+            </p>
           ) : (
             <table className="table table-striped table-hover">
               <thead className="table-dark">
@@ -157,7 +160,7 @@ function Remitos() {
                   <tr key={linea.id}>
                     <td>{linea.tambo_id}</td>
                     <td>{linea.litros_recibidos}</td>
-                    <td>{linea.temperatura_celsius}°C</td>
+                    <td>{linea.temperatura_celcius}°C</td>
                     <td>{linea.numero_cisterna}</td>
                     <td>{linea.hora_recoleccion}</td>
                     <td>

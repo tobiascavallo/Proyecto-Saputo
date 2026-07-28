@@ -36,6 +36,7 @@ type RemitoService struct {
 	acopladoRepo AcopladoRepositoryParaRemito
 	empresaRepo  EmpresaRepositoryParaRemito
 	cfg          config.Config
+	lineaService LineaRecoleccionRepository
 }
 
 func NewRemitoService(
@@ -44,6 +45,7 @@ func NewRemitoService(
 	acopladoRepo AcopladoRepositoryParaRemito,
 	empresaRepo EmpresaRepositoryParaRemito,
 	cfg config.Config,
+	lineaService LineaRecoleccionRepository,
 ) RemitoService {
 	return RemitoService{
 		repo:         repo,
@@ -51,6 +53,7 @@ func NewRemitoService(
 		acopladoRepo: acopladoRepo,
 		empresaRepo:  empresaRepo,
 		cfg:          cfg,
+		lineaService: lineaService,
 	}
 }
 
@@ -116,6 +119,17 @@ func (s RemitoService) FinalizarRemito(id primitive.ObjectID) error {
 	_, err := s.repo.ObtenerRemitoPorID(s.cfg, id)
 	if err != nil {
 		return errors.New("remito no encontrado")
+	}
+
+	lineas, err := s.lineaService.ObtenerLineasPorRemito(s.cfg, id)
+
+	if err != nil {
+		return errors.New("error al verificar lineas de remito")
+	}
+
+	if len(lineas) == 0{
+		return errors.New("Error al finalizar remito por falta de lineas de recoleccion")
+
 	}
 	return s.repo.ActualizarEstadoRemito(s.cfg, id, models.EstadoRemitoFinalizado)
 }

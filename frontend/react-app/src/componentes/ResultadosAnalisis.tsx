@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchConToken } from "../api";
+import { API_URL, fetchConToken } from "../api";
 
 function ResultadosAnalisis() {
   const [resultados, setResultados] = useState<any[]>([]);
@@ -10,7 +10,7 @@ function ResultadosAnalisis() {
     async function fetchResultados() {
       try {
         const response = await fetchConToken(
-          "http://localhost:8080/api/v1/resultadoAnalisis",
+          `${API_URL}/api/v1/resultadoAnalisis`,
         );
 
         if (!response.ok) {
