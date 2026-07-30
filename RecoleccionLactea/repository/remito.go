@@ -90,3 +90,17 @@ func (r RemitoRepositoryImpl) ActualizarEstadoRemito(cfg config.Config, id primi
 	)
 	return err
 }
+
+// ObtenerRemitosPorEstadoGeneral devuelve todos los remitos del sistema que tengan
+// el estado indicado, sin filtrar por camionero. La usa el Encargado/Empleado
+// para ver el estado general de todos los remitos, no solo los propios.
+func (r RemitoRepositoryImpl) ObtenerRemitosPorEstadoGeneral(cfg config.Config, estado models.EstadoRemito) ([]models.Remito, error) {
+	collection := db.DB.Database(cfg.MongoDB).Collection("remitos")
+	cursor, err := collection.Find(context.TODO(), bson.M{"estado_remito": estado})
+	if err != nil {
+		return nil, err
+	}
+	var remitos []models.Remito
+	err = cursor.All(context.TODO(), &remitos)
+	return remitos, err
+}

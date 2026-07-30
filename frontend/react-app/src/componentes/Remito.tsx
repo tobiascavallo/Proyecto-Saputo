@@ -6,16 +6,27 @@ function Remitos() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
 
+  // Filtro de estado — arranca en "en_curso" para que el aterrizaje sea limpio
+  const [filtroEstado, setFiltroEstado] = useState("en_curso");
+
   const [remitoSeleccionado, setRemitoSeleccionado] = useState<any>(null);
   const [lineasDelRemito, setLineasDelRemito] = useState<any[]>([]);
   const [resultados, setResultados] = useState<any[]>([]);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
 
-  // Carga inicial — trae la lista de remitos apenas se abre la pantalla
+  // Trae los remitos según el filtro activo. Se vuelve a ejecutar
+  // automáticamente cada vez que "filtroEstado" cambia, gracias
+  // al array de dependencias [filtroEstado].
   useEffect(() => {
     async function fetchRemitos() {
+      setCargando(true);
       try {
-        const response = await fetchConToken(`${API_URL}/api/v1/remito`);
+        // "todos" es un valor solo del frontend — si se elige, no mandamos
+        // el query param "estado" y el backend devuelve todo sin filtrar.
+        const query = filtroEstado === "todos" ? "" : `?estado=${filtroEstado}`;
+        const response = await fetchConToken(
+          `${API_URL}/api/v1/remito${query}`,
+        );
 
         if (!response.ok) {
           setError("Error al obtener los remitos");
@@ -32,7 +43,7 @@ function Remitos() {
     }
 
     fetchRemitos();
-  }, []);
+  }, [filtroEstado]);
 
   // Se ejecuta recién cuando el usuario clickea "Ver detalle" de un remito
   async function verDetalleRemito(remito: any) {
@@ -40,16 +51,12 @@ function Remitos() {
     setCargandoDetalle(true);
 
     try {
-      // Trae las líneas de recolección de ese remito
       const responseLineas = await fetchConToken(
         `${API_URL}/api/v1/lineaRecoleccion/remito/${remito.id}`,
       );
       const dataLineas = await responseLineas.json();
-      // El backend devuelve null (no []) si no hay líneas todavía
       setLineasDelRemito(dataLineas || []);
 
-      // Trae los resultados de análisis de todo el sistema
-      // (después los cruzamos por linea_recoleccion_id)
       const responseResultados = await fetchConToken(
         `${API_URL}/api/v1/resultadoAnalisis`,
       );
@@ -68,7 +75,6 @@ function Remitos() {
     setResultados([]);
   }
 
-  // Busca el resultado de análisis correspondiente a una línea específica
   function resultadoDeLinea(lineaId: string) {
     return resultados.find((r: any) => r.linea_recoleccion_id === lineaId);
   }
@@ -81,54 +87,79 @@ function Remitos() {
     return <span className="badge bg-warning">Pendiente</span>;
   }
 
-  if (cargando) return <p className="p-4">Cargando remitos...</p>;
   if (error) return <p className="p-4 text-danger">{error}</p>;
 
   return (
     <div className="p-4">
-      {/* Vista lista — solo se muestra si NO hay remito seleccionado */}
       {!remitoSeleccionado && (
         <>
           <h2 className="mb-4">Remitos</h2>
-          <table className="table table-striped table-hover">
-            <thead className="table-dark">
-              <tr>
-                <th>N° Remito</th>
-                <th>Fecha</th>
-                <th>Camionero</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {remitos.map((remito: any) => (
-                <tr key={remito.id}>
-                  <td>{remito.numero_remito}</td>
-                  <td>{remito.fecha}</td>
-                  <td>{remito.camionero_id}</td>
-                  <td>
-                    {remito.estado_remito === "finalizado" ? (
-                      <span className="badge bg-secondary">Finalizado</span>
-                    ) : (
-                      <span className="badge bg-info">En curso</span>
-                    )}
-                  </td>
-                  <td>
-                    <button
-                      className="btn btn-sm btn-outline-primary"
-                      onClick={() => verDetalleRemito(remito)}
-                    >
-                      Ver detalle
-                    </button>
-                  </td>
+
+          {/* Selector de estado — un solo valor a la vez, mapea 1 a 1
+              con el query param "estado" que espera el backend */}
+          <div className="btn-group mb-3">
+            <button
+              className={`btn btn-sm ${filtroEstado === "en_curso" ? "btn-primary" : "btn-outline-primary"}`}
+              onClick={() => setFiltroEstado("en_curso")}
+            >
+              En curso
+            </button>
+            <button
+              className={`btn btn-sm ${filtroEstado === "finalizado" ? "btn-primary" : "btn-outline-primary"}`}
+              onClick={() => setFiltroEstado("finalizado")}
+            >
+              Finalizado
+            </button>
+            <button
+              className={`btn btn-sm ${filtroEstado === "todos" ? "btn-primary" : "btn-outline-primary"}`}
+              onClick={() => setFiltroEstado("todos")}
+            >
+              Todos
+            </button>
+          </div>
+
+          {cargando ? (
+            <p>Cargando remitos...</p>
+          ) : (
+            <table className="table table-striped table-hover">
+              <thead className="table-dark">
+                <tr>
+                  <th>N° Remito</th>
+                  <th>Fecha</th>
+                  <th>Camionero</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {remitos.map((remito: any) => (
+                  <tr key={remito.id}>
+                    <td>{remito.numero_remito}</td>
+                    <td>{remito.fecha}</td>
+                    <td>{remito.camionero_id}</td>
+                    <td>
+                      {remito.estado_remito === "finalizado" ? (
+                        <span className="badge bg-secondary">Finalizado</span>
+                      ) : (
+                        <span className="badge bg-info">En curso</span>
+                      )}
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={() => verDetalleRemito(remito)}
+                      >
+                        Ver detalle
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </>
       )}
 
-      {/* Vista detalle — solo se muestra si HAY remito seleccionado */}
       {remitoSeleccionado && (
         <div>
           <button className="btn btn-secondary mb-3" onClick={volverALista}>

@@ -16,6 +16,7 @@ type RemitoRepository interface {
 	ObtenerRemitosPorEstado(cfg config.Config, camioneroID primitive.ObjectID, estado models.EstadoRemito) ([]models.Remito, error)
 	ActualizarEstadoSincronizacion(cfg config.Config, id primitive.ObjectID, estado models.EstadoSincronizacion) error
 	ActualizarEstadoRemito(cfg config.Config, id primitive.ObjectID, estado models.EstadoRemito) error
+	ObtenerRemitosPorEstadoGeneral(cfg config.Config, estado models.EstadoRemito) ([]models.Remito, error)
 }
 
 type VehiculoRepositoryParaRemito interface {
@@ -84,9 +85,22 @@ func (s RemitoService) CrearRemito(model models.Remito) error {
 	return s.repo.CrearRemito(s.cfg, model)
 }
 
-func (s RemitoService) ObtenerRemitos(rolUsuario string, camioneroID primitive.ObjectID) ([]models.Remito, error) {
+// ObtenerRemitos devuelve remitos según el rol de quien pregunta.
+//   - Camionero: solo ve SUS remitos (todos, o filtrados por estado si "estado" viene con valor).
+//   - Cualquier otro rol (encargado/empleado): ve TODOS los remitos del sistema
+//     (todos, o filtrados por estado si "estado" viene con valor).
+//
+// El filtro por estado es opcional: si "estado" viene vacío, no se aplica.
+func (s RemitoService) ObtenerRemitos(rolUsuario string, camioneroID primitive.ObjectID, estado string) ([]models.Remito, error) {
 	if rolUsuario == string(models.RolCamionero) {
+		if estado != "" {
+			return s.repo.ObtenerRemitosPorEstado(s.cfg, camioneroID, models.EstadoRemito(estado))
+		}
 		return s.repo.ObtenerRemitoPorCamionero(s.cfg, camioneroID)
+	}
+
+	if estado != "" {
+		return s.repo.ObtenerRemitosPorEstadoGeneral(s.cfg, models.EstadoRemito(estado))
 	}
 	return s.repo.ObtenerRemitos(s.cfg)
 }
@@ -127,7 +141,7 @@ func (s RemitoService) FinalizarRemito(id primitive.ObjectID) error {
 		return errors.New("error al verificar lineas de remito")
 	}
 
-	if len(lineas) == 0{
+	if len(lineas) == 0 {
 		return errors.New("Error al finalizar remito por falta de lineas de recoleccion")
 
 	}

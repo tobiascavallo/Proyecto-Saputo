@@ -9,7 +9,7 @@ import (
 
 type RemitoService interface {
 	CrearRemito(model models.Remito) error
-	ObtenerRemitos(rolUsuario string, camioneroID primitive.ObjectID) ([]models.Remito, error)
+	ObtenerRemitos(rolUsuario string, camioneroID primitive.ObjectID, estado string) ([]models.Remito, error)
 	ObtenerRemitoPorID(id primitive.ObjectID, rolUsuario string, camioneroID primitive.ObjectID) (*models.Remito, error)
 	ObtenerRemitosPorEstado(camioneroID primitive.ObjectID, estado models.EstadoRemito) ([]models.Remito, error)
 	FinalizarRemito(id primitive.ObjectID) error
@@ -49,13 +49,16 @@ func (h RemitoHandler) CrearRemito(c *gin.Context) {
 	c.JSON(201, gin.H{"mensaje": "remito creado correctamente"})
 }
 
+// ObtenerRemitos — endpoint único de listado de remitos.
+// El rol (camionero vs resto) viene del JWT, no lo manda el frontend.
+// Acepta ?estado=en_curso|finalizado como filtro opcional en la query string.
 func (h RemitoHandler) ObtenerRemitos(c *gin.Context) {
 	rolUsuario, _ := c.Get("rol")
 	usuarioIDStr, _ := c.Get("usuario_id")
-
 	camioneroID, _ := primitive.ObjectIDFromHex(usuarioIDStr.(string))
+	estado := c.Query("estado") // vacío = sin filtro, trae todos
 
-	remitos, err := h.service.ObtenerRemitos(rolUsuario.(string), camioneroID)
+	remitos, err := h.service.ObtenerRemitos(rolUsuario.(string), camioneroID, estado)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "error al obtener remitos"})
 		return
