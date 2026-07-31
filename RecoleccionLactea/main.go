@@ -193,5 +193,26 @@ func main() {
 		resultado.PUT("/:id", middleware.RequiereRol("encargado"), resultadoAnalisisHandler.ActualizarResultado)
 	}
 
+	// --- Tiempo real (SSE) ---
+	// El navegador (EventSource) no permite mandar el header Authorization,
+	// así que la conexión de streaming se autentica con un ticket de un solo
+	// uso en vez del JWT normal. Ver services/ticket_sse.go y
+	// middleware/auth_sse.go para el detalle.
+	ticketSSEService := services.NewTicketSSEService()
+	ticketSSEHandler := handlers.NewTicketSSEHandler(ticketSSEService)
+	eventosHandler := handlers.NewEventosHandler()
+
+	eventosTicket := r.Group("/api/v1/eventos")
+	eventosTicket.Use(middleware.AuthMiddleware())
+	{
+		eventosTicket.POST("/ticket", middleware.RequiereRol("empleado", "encargado"), ticketSSEHandler.GenerarTicket)
+	}
+
+	eventosStream := r.Group("/api/v1/eventos")
+	eventosStream.Use(middleware.AuthMiddlewareSSE(ticketSSEService))
+	{
+		eventosStream.GET("", middleware.RequiereRol("empleado", "encargado"), eventosHandler.Stream)
+	}
+
 	r.Run(":" + cfg.Port)
 }
