@@ -33,6 +33,7 @@ type ResultadoAnalisisService struct {
 	sapRepo   ResultadoSAPRepositoryParaResultado
 	lineaRepo LineaRepositoryParaResultado
 	cfg       config.Config
+	hub       NotificadorSSE
 }
 
 func NewResultadoAnalisisService(
@@ -40,12 +41,14 @@ func NewResultadoAnalisisService(
 	sapRepo ResultadoSAPRepositoryParaResultado,
 	lineaRepo LineaRepositoryParaResultado,
 	cfg config.Config,
+	hub NotificadorSSE,
 ) ResultadoAnalisisService {
 	return ResultadoAnalisisService{
 		repo:      repo,
 		sapRepo:   sapRepo,
 		lineaRepo: lineaRepo,
 		cfg:       cfg,
+		hub:       hub,
 	}
 }
 
@@ -83,7 +86,18 @@ func (s ResultadoAnalisisService) ObtenerResultadoDesdeSAP(codigo string, encarg
 		EncargadoID:        encargadoID,
 	}
 
-	return s.repo.CrearResultadoAnalisis(s.cfg, nuevoResultado)
+	if err := s.repo.CrearResultadoAnalisis(s.cfg, nuevoResultado); err != nil {
+		return err
+	}
+
+	if s.hub != nil {
+		s.hub.Notificar("resultado_cargado", map[string]string{
+			"lineaRecoleccionId": linea.ID.Hex(),
+			"tipoMuestra":        string(nuevoResultado.TipoMuestra),
+			"resultado":          string(nuevoResultado.Resultado),
+		})
+	}
+	return nil
 }
 
 // ObtenerResultados devuelve todos los resultados con filtro opcional por estado.
@@ -123,5 +137,12 @@ func (s ResultadoAnalisisService) ActualizarResultado(id primitive.ObjectID, mod
 	if err != nil {
 		return errors.New("resultado no encontrado")
 	}
-	return s.repo.ActualizarResultado(s.cfg, id, model)
+	if err := s.repo.ActualizarResultado(s.cfg, id, model); err != nil {
+		return err
+	}
+
+	if s.hub != nil {
+		s.hub.Notificar("resultado_actualizado", map[string]string{"resultadoId": id.Hex()})
+	}
+	return nil
 }

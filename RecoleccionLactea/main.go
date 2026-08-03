@@ -130,10 +130,14 @@ func main() {
 		tambo.PATCH("/:id", middleware.RequiereRol("encargado"), tamboHandler.ActualizarTambo)
 		tambo.DELETE("/:id", middleware.RequiereRol("encargado"), tamboHandler.DesactivarTambo)
 	}
+	// Hub de eventos en tiempo real (SSE). Se crea antes que los services que
+	// lo van a usar para notificar (Remito, ResultadoAnalisis, SolicitudEdicion).
+	hubSSE := services.NewHubSSE()
+
 	lineaRepo := repository.LineaRecoleccionRepositoryImpl{}
 
 	remitoRepo := repository.RemitoRepositoryImpl{}
-	remitoService := services.NewRemitoService(remitoRepo, vehiculoRepo, acopladoRepo, empresaRepo, cfg, lineaRepo)
+	remitoService := services.NewRemitoService(remitoRepo, vehiculoRepo, acopladoRepo, empresaRepo, cfg, lineaRepo, hubSSE)
 	remitoHandler := handlers.NewRemitoHandler(remitoService)
 
 	remito := r.Group("/api/v1/remito")
@@ -150,7 +154,7 @@ func main() {
 	}
 
 	solicitudRepo := repository.SolicitudEdicionRepositoryImpl{}
-	solicitudService := services.NewSolicitudEdicionService(solicitudRepo, lineaRepo, remitoRepo, cfg)
+	solicitudService := services.NewSolicitudEdicionService(solicitudRepo, lineaRepo, remitoRepo, cfg, hubSSE)
 	solicitudHandler := handlers.NewSolicitudEdicionHandler(solicitudService)
 
 	solicitud := r.Group("/api/v1/solicitudEdicion")
@@ -180,7 +184,7 @@ func main() {
 
 	resultadoAnalisisRepo := repository.ResultadoAnalisisRepositoryImpl{}
 	resultadoSAPRepo := repository.ResultadoSAPRepositoryImpl{}
-	resultadoAnalisisService := services.NewResultadoAnalisisService(resultadoAnalisisRepo, resultadoSAPRepo, lineaRepo, cfg)
+	resultadoAnalisisService := services.NewResultadoAnalisisService(resultadoAnalisisRepo, resultadoSAPRepo, lineaRepo, cfg, hubSSE)
 	resultadoAnalisisHandler := handlers.NewResultadoAnalisisHandler(resultadoAnalisisService)
 
 	resultado := r.Group("/api/v1/resultadoAnalisis")
@@ -200,7 +204,7 @@ func main() {
 	// middleware/auth_sse.go para el detalle.
 	ticketSSEService := services.NewTicketSSEService()
 	ticketSSEHandler := handlers.NewTicketSSEHandler(ticketSSEService)
-	eventosHandler := handlers.NewEventosHandler()
+	eventosHandler := handlers.NewEventosHandler(hubSSE)
 
 	eventosTicket := r.Group("/api/v1/eventos")
 	eventosTicket.Use(middleware.AuthMiddleware())

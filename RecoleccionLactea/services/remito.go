@@ -38,6 +38,7 @@ type RemitoService struct {
 	empresaRepo  EmpresaRepositoryParaRemito
 	cfg          config.Config
 	lineaService LineaRecoleccionRepository
+	hub          NotificadorSSE
 }
 
 func NewRemitoService(
@@ -47,6 +48,7 @@ func NewRemitoService(
 	empresaRepo EmpresaRepositoryParaRemito,
 	cfg config.Config,
 	lineaService LineaRecoleccionRepository,
+	hub NotificadorSSE,
 ) RemitoService {
 	return RemitoService{
 		repo:         repo,
@@ -55,6 +57,7 @@ func NewRemitoService(
 		empresaRepo:  empresaRepo,
 		cfg:          cfg,
 		lineaService: lineaService,
+		hub:          hub,
 	}
 }
 
@@ -145,7 +148,14 @@ func (s RemitoService) FinalizarRemito(id primitive.ObjectID) error {
 		return errors.New("Error al finalizar remito por falta de lineas de recoleccion")
 
 	}
-	return s.repo.ActualizarEstadoRemito(s.cfg, id, models.EstadoRemitoFinalizado)
+	if err := s.repo.ActualizarEstadoRemito(s.cfg, id, models.EstadoRemitoFinalizado); err != nil {
+		return err
+	}
+
+	if s.hub != nil {
+		s.hub.Notificar("remito_finalizado", map[string]string{"remitoId": id.Hex()})
+	}
+	return nil
 }
 
 func (s RemitoService) SincronizarRemito(id primitive.ObjectID) error {
@@ -156,5 +166,12 @@ func (s RemitoService) SincronizarRemito(id primitive.ObjectID) error {
 	if err != nil {
 		return errors.New("remito no encontrado")
 	}
-	return s.repo.ActualizarEstadoSincronizacion(s.cfg, id, models.EstadoSincronizado)
+	if err := s.repo.ActualizarEstadoSincronizacion(s.cfg, id, models.EstadoSincronizado); err != nil {
+		return err
+	}
+
+	if s.hub != nil {
+		s.hub.Notificar("remito_sincronizado", map[string]string{"remitoId": id.Hex()})
+	}
+	return nil
 }

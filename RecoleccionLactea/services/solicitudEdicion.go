@@ -31,6 +31,7 @@ type SolicitudEdicionService struct {
 	lineaRepo  LineaRepositoryParaSolicitud
 	remitoRepo RemitoRepositoryParaSolicitud
 	cfg        config.Config
+	hub        NotificadorSSE
 }
 
 func NewSolicitudEdicionService(
@@ -38,12 +39,14 @@ func NewSolicitudEdicionService(
 	lineaRepo LineaRepositoryParaSolicitud,
 	remitoRepo RemitoRepositoryParaSolicitud,
 	cfg config.Config,
+	hub NotificadorSSE,
 ) SolicitudEdicionService {
 	return SolicitudEdicionService{
 		repo:       repo,
 		lineaRepo:  lineaRepo,
 		remitoRepo: remitoRepo,
 		cfg:        cfg,
+		hub:        hub,
 	}
 }
 
@@ -123,5 +126,15 @@ func (s SolicitudEdicionService) TomarDecision(id primitive.ObjectID, estado mod
 	if solicitud.Estado != models.SolicitudPendiente {
 		return errors.New("la solicitud ya fue procesada")
 	}
-	return s.repo.ActualizarEstadoSolicitud(s.cfg, id, estado)
+	if err := s.repo.ActualizarEstadoSolicitud(s.cfg, id, estado); err != nil {
+		return err
+	}
+
+	if s.hub != nil {
+		s.hub.Notificar("solicitud_resuelta", map[string]string{
+			"solicitudId": id.Hex(),
+			"estado":      string(estado),
+		})
+	}
+	return nil
 }
