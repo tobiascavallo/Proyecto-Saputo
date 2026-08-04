@@ -1,34 +1,42 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { API_URL, fetchConToken } from "../api";
+import { useEventosSSE } from "../sse";
 
 function ResultadosAnalisis() {
   const [resultados, setResultados] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    async function fetchResultados() {
-      try {
-        const response = await fetchConToken(
-          `${API_URL}/api/v1/resultadoAnalisis`,
-        );
+  const fetchResultados = useCallback(async () => {
+    try {
+      const response = await fetchConToken(
+        `${API_URL}/api/v1/resultadoAnalisis`,
+      );
 
-        if (!response.ok) {
-          setError("Error al obtener los resultados");
-          return;
-        }
-
-        const data = await response.json();
-        setResultados(data);
-      } catch (error) {
-        setError("Error al conectar con el servidor");
-      } finally {
-        setCargando(false);
+      if (!response.ok) {
+        setError("Error al obtener los resultados");
+        return;
       }
-    }
 
-    fetchResultados();
+      const data = await response.json();
+      setResultados(data || []);
+    } catch (error) {
+      setError("Error al conectar con el servidor");
+    } finally {
+      setCargando(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchResultados();
+  }, [fetchResultados]);
+
+  // Tiempo real: un resultado cargado o corregido en otra sesión refresca
+  // la lista automáticamente.
+  useEventosSSE({
+    resultado_cargado: fetchResultados,
+    resultado_actualizado: fetchResultados,
+  });
 
   if (cargando) return <p className="p-4">Cargando...</p>;
   if (error) return <p className="p-4 text-danger">{error}</p>;

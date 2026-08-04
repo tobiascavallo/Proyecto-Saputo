@@ -77,6 +77,27 @@ func (h UsuarioHandler) ObtenerUsuarioPorID(c *gin.Context) {
 	c.JSON(200, dto.UsuarioToResponse(*usuario))
 }
 
+// ObtenerUsuarioBasico expone un subconjunto de los datos de un usuario
+// puntual (sin el flag "activo") para roles que no tienen acceso al listado
+// completo de usuarios — hoy, empleado. Se usa desde el frontend para mostrar
+// el detalle de un camionero a partir de su ID (por ejemplo, en el detalle de
+// un remito) sin abrir el endpoint de gestión de usuarios.
+func (h UsuarioHandler) ObtenerUsuarioBasico(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	usuario, err := h.service.ObtenerUsuarioPorID(id)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "usuario no encontrado"})
+		return
+	}
+
+	c.JSON(200, dto.UsuarioToBasicoResponse(*usuario))
+}
+
 func (h UsuarioHandler) ActualizarUsuario(c *gin.Context) {
 	id, err := primitive.ObjectIDFromHex(c.Param("id"))
 	if err != nil {

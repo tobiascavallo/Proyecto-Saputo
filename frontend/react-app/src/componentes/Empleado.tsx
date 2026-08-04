@@ -2,12 +2,13 @@ import { useState } from "react";
 import Remitos from "./Remito";
 import ResultadosAnalisis from "./ResultadosAnalisis";
 import Navbar from "./Navbar";
+import { DatosReferenciaProvider } from "../contextos/DatosReferenciaContext";
 
 function Empleado() {
   const [seccionActiva, setSeccionActiva] = useState("remitos");
 
   return (
-    <>
+    <DatosReferenciaProvider>
       <Navbar titulo="Panel Empleado" />
       <div className="container-fluid">
         <div className="row">
@@ -38,7 +39,7 @@ function Empleado() {
           </div>
         </div>
       </div>
-    </>
+    </DatosReferenciaProvider>
   );
 }
 

@@ -1,35 +1,69 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { API_URL, fetchConToken } from "../api";
+import { useEventosSSE } from "../sse";
+import NombreUsuario from "./NombreUsuario";
 
 function SolicitudesEdicion() {
   const [solicitudes, setSolicitudes] = useState<any[]>([]);
   const [solicitudSeleccionada, setSolicitudSeleccionada] = useState<any>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState<{
+    mensaje: string;
+    tipo: "warning" | "info";
+  } | null>(null);
+
+  function mostrarToast(mensaje: string, tipo: "warning" | "info") {
+    setToast({ mensaje, tipo });
+    setTimeout(() => setToast(null), 4000);
+  }
+
+  const fetchSolicitudes = useCallback(async () => {
+    try {
+      const response = await fetchConToken(
+        `${API_URL}/api/v1/solicitudEdicion`,
+      );
+
+      if (!response.ok) {
+        setError("Error al obtener las solicitudes");
+        return;
+      }
+
+      const data = await response.json();
+      setSolicitudes(data || []);
+    } catch (error) {
+      setError("Error al conectar con el servidor");
+    } finally {
+      setCargando(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function fetchSolicitudes() {
-      try {
-        const response = await fetchConToken(
-          `${API_URL}/api/v1/solicitudEdicion`,
-        );
-
-        if (!response.ok) {
-          setError("Error al obtener las solicitudes");
-          return;
-        }
-
-        const data = await response.json();
-        setSolicitudes(data);
-      } catch (error) {
-        setError("Error al conectar con el servidor");
-      } finally {
-        setCargando(false);
-      }
-    }
-
     fetchSolicitudes();
-  }, []);
+  }, [fetchSolicitudes]);
+
+  // Tiempo real: una solicitud nueva (de cualquier camionero) o la
+  // resolución de una ya existente refrescan la lista y disparan un aviso
+  // breve. "solicitud_creada" es lo que permite avisar apenas entra una
+  // pendiente nueva, sin esperar a que algo más dispare un refresco.
+  useEventosSSE({
+    solicitud_creada: () => {
+      fetchSolicitudes();
+      mostrarToast("Llegó una solicitud de edición nueva", "warning");
+    },
+    solicitud_resuelta: (datos) => {
+      fetchSolicitudes();
+      mostrarToast(
+        `Una solicitud fue ${datos?.estado === "aprobada" ? "aprobada" : "rechazada"}`,
+        "info",
+      );
+    },
+  });
+
+  const pendientes = useMemo(
+    () => solicitudes.filter((s) => s.estado === "pendiente").length,
+    [solicitudes],
+  );
 
   async function tomarDecision(id: string, decision: "aprobada" | "rechazada") {
     try {
@@ -43,8 +77,10 @@ function SolicitudesEdicion() {
       );
 
       if (!response.ok) {
+        const data = await response.json();
         setError(
-          "El servidor rechazó la decisión — la solicitud puede haber cambiado de estado",
+          data.error ||
+            "El servidor rechazó la decisión — la solicitud puede haber cambiado de estado",
         );
         return;
       }
@@ -71,14 +107,30 @@ function SolicitudesEdicion() {
 
   return (
     <div className="p-4">
-      <h2 className="mb-4">Solicitudes de edición</h2>
+      {toast && (
+        <div
+          className={`toast show position-fixed top-0 end-0 m-3 text-bg-${toast.tipo}`}
+          style={{ zIndex: 1080 }}
+        >
+          <div className="toast-body">{toast.mensaje}</div>
+        </div>
+      )}
+
+      <h2 className="mb-4">
+        Solicitudes de edición
+        {pendientes > 0 && (
+          <span className="badge bg-warning ms-2 align-middle">
+            {pendientes} pendiente{pendientes > 1 ? "s" : ""}
+          </span>
+        )}
+      </h2>
 
       {/* Lista de solicitudes */}
       {!solicitudSeleccionada && (
         <table className="table table-striped table-hover">
           <thead className="table-dark">
             <tr>
-              <th>Camionero ID</th>
+              <th>Camionero</th>
               <th>Línea de recolección</th>
               <th>Motivo</th>
               <th>Estado</th>
@@ -88,7 +140,9 @@ function SolicitudesEdicion() {
           <tbody>
             {solicitudes.map((s: any) => (
               <tr key={s.id}>
-                <td>{s.camionero_id}</td>
+                <td>
+                  <NombreUsuario key={s.camionero_id} id={s.camionero_id} />
+                </td>
                 <td>{s.linea_recoleccion_id}</td>
                 <td>{s.motivo}</td>
                 <td>
@@ -121,7 +175,11 @@ function SolicitudesEdicion() {
         <div className="card p-4">
           <h5 className="mb-3">Detalle de solicitud</h5>
           <p>
-            <strong>Camionero ID:</strong> {solicitudSeleccionada.camionero_id}
+            <strong>Camionero:</strong>{" "}
+            <NombreUsuario
+              key={solicitudSeleccionada.camionero_id}
+              id={solicitudSeleccionada.camionero_id}
+            />
           </p>
           <p>
             <strong>Motivo:</strong> {solicitudSeleccionada.motivo}

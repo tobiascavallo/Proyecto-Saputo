@@ -29,7 +29,8 @@ function Login() {
       });
 
       if (!response.ok) {
-        setError("Email o contraseña incorrectos");
+        const data = await response.json();
+        setError(data.error || "Email o contraseña incorrectos");
         return;
       }
 

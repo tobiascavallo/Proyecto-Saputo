@@ -50,6 +50,7 @@ func main() {
 		usuario.POST("", middleware.RequiereRol("encargado"), usuarioHandler.CrearUsuario)
 		usuario.GET("", middleware.RequiereRol("encargado"), usuarioHandler.ObtenerUsuarios)
 		usuario.GET("/:id", middleware.RequiereRol("encargado"), usuarioHandler.ObtenerUsuarioPorID)
+		usuario.GET("/:id/basico", middleware.RequiereRol("empleado", "encargado"), usuarioHandler.ObtenerUsuarioBasico)
 		usuario.PUT("/:id", middleware.RequiereRol("encargado"), usuarioHandler.ActualizarUsuario)
 		usuario.DELETE("/:id", middleware.RequiereRol("encargado"), usuarioHandler.DesactivarUsuario)
 	}

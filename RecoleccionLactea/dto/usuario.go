@@ -37,3 +37,26 @@ func UsuarioToResponse(u models.Usuario) UsuarioResponse {
 		Activo:   u.Activo,
 	}
 }
+
+// UsuarioBasicoResponse es una versión reducida de UsuarioResponse (sin
+// "activo") pensada para el endpoint /usuario/:id/basico: permite que un
+// empleado consulte el nombre de un camionero puntual (por ejemplo, desde el
+// detalle de un remito) sin darle acceso al listado completo de usuarios,
+// que sigue reservado a encargado.
+type UsuarioBasicoResponse struct {
+	ID       string `json:"id"`
+	Nombre   string `json:"nombre"`
+	Apellido string `json:"apellido"`
+	Email    string `json:"email"`
+	Rol      string `json:"rol"`
+}
+
+func UsuarioToBasicoResponse(u models.Usuario) UsuarioBasicoResponse {
+	return UsuarioBasicoResponse{
+		ID:       u.ID.Hex(),
+		Nombre:   u.Nombre,
+		Apellido: u.Apellido,
+		Email:    u.Email,
+		Rol:      string(u.Rol),
+	}
+}

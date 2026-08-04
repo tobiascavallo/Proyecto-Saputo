@@ -87,7 +87,23 @@ func (s SolicitudEdicionService) CrearSolicitud(model models.SolicitudEdicion, c
 
 	model.CamioneroID = camioneroID
 	model.Estado = models.SolicitudPendiente
-	return s.repo.CrearSolicitud(s.cfg, model)
+
+	// Se genera el ID acá (en vez de dejar que Mongo lo asigne en el
+	// InsertOne) porque lo necesitamos ya mismo para el evento SSE de abajo,
+	// y CrearSolicitud no devuelve el documento insertado ni su InsertedID.
+	model.ID = primitive.NewObjectID()
+
+	if err := s.repo.CrearSolicitud(s.cfg, model); err != nil {
+		return err
+	}
+
+	if s.hub != nil {
+		s.hub.Notificar("solicitud_creada", map[string]string{
+			"solicitudId": model.ID.Hex(),
+			"camioneroId": camioneroID.Hex(),
+		})
+	}
+	return nil
 }
 
 // ObtenerSolicitudes devuelve todas las solicitudes — solo encargado.

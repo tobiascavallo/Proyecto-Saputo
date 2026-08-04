@@ -1,7 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { API_URL, fetchConToken } from "../api";
+import { useEventosSSE } from "../sse";
+import { useDatosReferencia } from "../contextos/DatosReferenciaContext";
+import NombreUsuario from "./NombreUsuario";
 
 function Remitos() {
+  const { nombreTambo } = useDatosReferencia();
   const [remitos, setRemitos] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -14,36 +18,43 @@ function Remitos() {
   const [resultados, setResultados] = useState<any[]>([]);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
 
-  // Trae los remitos según el filtro activo. Se vuelve a ejecutar
-  // automáticamente cada vez que "filtroEstado" cambia, gracias
-  // al array de dependencias [filtroEstado].
-  useEffect(() => {
-    async function fetchRemitos() {
-      setCargando(true);
-      try {
-        // "todos" es un valor solo del frontend — si se elige, no mandamos
-        // el query param "estado" y el backend devuelve todo sin filtrar.
-        const query = filtroEstado === "todos" ? "" : `?estado=${filtroEstado}`;
-        const response = await fetchConToken(
-          `${API_URL}/api/v1/remito${query}`,
-        );
+  // Trae los remitos según el filtro activo. Se reusa tanto para el efecto
+  // que depende de "filtroEstado" como para el refresco disparado por SSE.
+  const fetchRemitos = useCallback(async () => {
+    setCargando(true);
+    try {
+      // "todos" es un valor solo del frontend — si se elige, no mandamos
+      // el query param "estado" y el backend devuelve todo sin filtrar.
+      const query = filtroEstado === "todos" ? "" : `?estado=${filtroEstado}`;
+      const response = await fetchConToken(
+        `${API_URL}/api/v1/remito${query}`,
+      );
 
-        if (!response.ok) {
-          setError("Error al obtener los remitos");
-          return;
-        }
-
-        const data = await response.json();
-        setRemitos(data || []);
-      } catch (error) {
-        setError("Error al conectar con el servidor");
-      } finally {
-        setCargando(false);
+      if (!response.ok) {
+        setError("Error al obtener los remitos");
+        return;
       }
-    }
 
-    fetchRemitos();
+      const data = await response.json();
+      setRemitos(data || []);
+    } catch (error) {
+      setError("Error al conectar con el servidor");
+    } finally {
+      setCargando(false);
+    }
   }, [filtroEstado]);
+
+  useEffect(() => {
+    fetchRemitos();
+  }, [fetchRemitos]);
+
+  // Tiempo real: cuando otro usuario sincroniza o finaliza un remito, no
+  // llega el objeto completo por el socket — alcanza con volver a pedir
+  // la lista para que quede al día.
+  useEventosSSE({
+    remito_sincronizado: fetchRemitos,
+    remito_finalizado: fetchRemitos,
+  });
 
   // Se ejecuta recién cuando el usuario clickea "Ver detalle" de un remito
   async function verDetalleRemito(remito: any) {
@@ -136,7 +147,12 @@ function Remitos() {
                   <tr key={remito.id}>
                     <td>{remito.numero_remito}</td>
                     <td>{remito.fecha}</td>
-                    <td>{remito.camionero_id}</td>
+                    <td>
+                      <NombreUsuario
+                        key={remito.camionero_id}
+                        id={remito.camionero_id}
+                      />
+                    </td>
                     <td>
                       {remito.estado_remito === "finalizado" ? (
                         <span className="badge bg-secondary">Finalizado</span>
@@ -189,7 +205,7 @@ function Remitos() {
               <tbody>
                 {lineasDelRemito.map((linea: any) => (
                   <tr key={linea.id}>
-                    <td>{linea.tambo_id}</td>
+                    <td>{nombreTambo(linea.tambo_id)}</td>
                     <td>{linea.litros_recibidos}</td>
                     <td>{linea.temperatura_celcius}°C</td>
                     <td>{linea.numero_cisterna}</td>
