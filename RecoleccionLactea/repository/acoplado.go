@@ -21,7 +21,8 @@ func (r AcopladoRepositoryImpl) CrearAcoplado(cfg config.Config, model models.Ac
 
 func (r AcopladoRepositoryImpl) ObtenerAcoplado(cfg config.Config) ([]models.Acoplado, error) {
 	collection := db.DB.Database(cfg.MongoDB).Collection("acoplados")
-	cursor, err := collection.Find(context.TODO(), bson.M{"activo": true})
+	// Devuelve activos e inactivos — el frontend filtra por estado en la UI.
+	cursor, err := collection.Find(context.TODO(), bson.M{})
 	if err != nil {
 		return nil, err
 	}

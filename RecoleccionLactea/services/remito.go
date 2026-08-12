@@ -10,13 +10,10 @@ import (
 
 type RemitoRepository interface {
 	CrearRemito(cfg config.Config, model models.Remito) error
-	ObtenerRemitos(cfg config.Config) ([]models.Remito, error)
+	ObtenerRemitosFiltrados(cfg config.Config, filtro models.RemitoFiltro) ([]models.Remito, error)
 	ObtenerRemitoPorID(cfg config.Config, ID primitive.ObjectID) (*models.Remito, error)
-	ObtenerRemitoPorCamionero(cfg config.Config, camioneroID primitive.ObjectID) ([]models.Remito, error)
-	ObtenerRemitosPorEstado(cfg config.Config, camioneroID primitive.ObjectID, estado models.EstadoRemito) ([]models.Remito, error)
 	ActualizarEstadoSincronizacion(cfg config.Config, id primitive.ObjectID, estado models.EstadoSincronizacion) error
 	ActualizarEstadoRemito(cfg config.Config, id primitive.ObjectID, estado models.EstadoRemito) error
-	ObtenerRemitosPorEstadoGeneral(cfg config.Config, estado models.EstadoRemito) ([]models.Remito, error)
 }
 
 type VehiculoRepositoryParaRemito interface {
@@ -89,23 +86,32 @@ func (s RemitoService) CrearRemito(model models.Remito) error {
 }
 
 // ObtenerRemitos devuelve remitos según el rol de quien pregunta.
-//   - Camionero: solo ve SUS remitos (todos, o filtrados por estado si "estado" viene con valor).
-//   - Cualquier otro rol (encargado/empleado): ve TODOS los remitos del sistema
-//     (todos, o filtrados por estado si "estado" viene con valor).
+//   - Camionero: solo ve SUS remitos — camioneroIDToken se fuerza como filtro
+//     sin importar qué venga en camioneroIDFiltro, para que no pueda espiar
+//     remitos de otro camionero pasando su ID por query param.
+//   - Encargado/empleado: camioneroIDFiltro se aplica libremente si vino
+//     (para acotar a un camionero puntual), o no se filtra si vino vacío.
 //
-// El filtro por estado es opcional: si "estado" viene vacío, no se aplica.
-func (s RemitoService) ObtenerRemitos(rolUsuario string, camioneroID primitive.ObjectID, estado string) ([]models.Remito, error) {
-	if rolUsuario == string(models.RolCamionero) {
-		if estado != "" {
-			return s.repo.ObtenerRemitosPorEstado(s.cfg, camioneroID, models.EstadoRemito(estado))
-		}
-		return s.repo.ObtenerRemitoPorCamionero(s.cfg, camioneroID)
-	}
+// El filtro por estado es opcional en ambos casos: si "estado" viene vacío, no se aplica.
+func (s RemitoService) ObtenerRemitos(rolUsuario string, camioneroIDToken primitive.ObjectID, estado string, camioneroIDFiltro string) ([]models.Remito, error) {
+	filtro := models.RemitoFiltro{}
 
 	if estado != "" {
-		return s.repo.ObtenerRemitosPorEstadoGeneral(s.cfg, models.EstadoRemito(estado))
+		e := models.EstadoRemito(estado)
+		filtro.Estado = &e
 	}
-	return s.repo.ObtenerRemitos(s.cfg)
+
+	if rolUsuario == string(models.RolCamionero) {
+		filtro.CamioneroID = &camioneroIDToken
+	} else if camioneroIDFiltro != "" {
+		id, err := primitive.ObjectIDFromHex(camioneroIDFiltro)
+		if err != nil {
+			return nil, errors.New("camionero_id inválido")
+		}
+		filtro.CamioneroID = &id
+	}
+
+	return s.repo.ObtenerRemitosFiltrados(s.cfg, filtro)
 }
 
 func (s RemitoService) ObtenerRemitoPorID(id primitive.ObjectID, rolUsuario string, camioneroID primitive.ObjectID) (*models.Remito, error) {
@@ -126,7 +132,10 @@ func (s RemitoService) ObtenerRemitosPorEstado(camioneroID primitive.ObjectID, e
 	if camioneroID.IsZero() {
 		return nil, errors.New("ID de camionero inválido")
 	}
-	return s.repo.ObtenerRemitosPorEstado(s.cfg, camioneroID, estado)
+	return s.repo.ObtenerRemitosFiltrados(s.cfg, models.RemitoFiltro{
+		CamioneroID: &camioneroID,
+		Estado:      &estado,
+	})
 }
 
 func (s RemitoService) FinalizarRemito(id primitive.ObjectID) error {

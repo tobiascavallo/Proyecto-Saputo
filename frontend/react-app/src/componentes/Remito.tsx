@@ -4,7 +4,16 @@ import { useEventosSSE } from "../sse";
 import { useDatosReferencia } from "../contextos/DatosReferenciaContext";
 import NombreUsuario from "./NombreUsuario";
 
-function Remitos() {
+interface RemitosProps {
+  // Si vienen, la vista queda acotada a los remitos de ese camionero
+  // puntual (usado desde Gestión → Camioneros, "Ver remitos"). Sin props,
+  // el comportamiento es el de siempre: todos los remitos del sistema.
+  camioneroId?: string;
+  nombreCamionero?: string;
+  onVolver?: () => void;
+}
+
+function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
   const { nombreTambo } = useDatosReferencia();
   const [remitos, setRemitos] = useState<any[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -25,9 +34,12 @@ function Remitos() {
     try {
       // "todos" es un valor solo del frontend — si se elige, no mandamos
       // el query param "estado" y el backend devuelve todo sin filtrar.
-      const query = filtroEstado === "todos" ? "" : `?estado=${filtroEstado}`;
+      const params = new URLSearchParams();
+      if (filtroEstado !== "todos") params.set("estado", filtroEstado);
+      if (camioneroId) params.set("camionero_id", camioneroId);
+      const query = params.toString();
       const response = await fetchConToken(
-        `${API_URL}/api/v1/remito${query}`,
+        `${API_URL}/api/v1/remito${query ? `?${query}` : ""}`,
       );
 
       if (!response.ok) {
@@ -42,7 +54,7 @@ function Remitos() {
     } finally {
       setCargando(false);
     }
-  }, [filtroEstado]);
+  }, [filtroEstado, camioneroId]);
 
   useEffect(() => {
     fetchRemitos();
@@ -104,7 +116,15 @@ function Remitos() {
     <div className="p-4">
       {!remitoSeleccionado && (
         <>
-          <h2 className="mb-4">Remitos</h2>
+          {camioneroId && onVolver && (
+            <button className="btn btn-secondary mb-3" onClick={onVolver}>
+              ← Volver a camioneros
+            </button>
+          )}
+
+          <h2 className="mb-4">
+            {camioneroId ? `Remitos de ${nombreCamionero}` : "Remitos"}
+          </h2>
 
           {/* Selector de estado — un solo valor a la vez, mapea 1 a 1
               con el query param "estado" que espera el backend */}

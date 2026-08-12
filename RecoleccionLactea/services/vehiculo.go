@@ -60,6 +60,7 @@ func (s VehiculoService) CrearVehiculo(model models.Vehiculo) error {
 		return errors.New("ya existe un vehículo con esa patente")
 	}
 
+	model.Activo = true
 	return s.repo.CrearVehiculo(s.cfg, model)
 }
 
@@ -76,13 +77,16 @@ func (s VehiculoService) ObtenerVehiculoPorID(id primitive.ObjectID) (*models.Ve
 	return s.repo.ObtenerVehiculosPorID(s.cfg, id)
 }
 
-// ActualizarVehiculo modifica los datos de un vehículo.
+// ActualizarVehiculo modifica los datos de un vehículo. Fusiona lo nuevo
+// sobre el registro existente antes de guardar — el repositorio hace un
+// $set del struct completo, así que dejar un campo en su valor cero
+// (incluido "activo") lo pisaría en la base en vez de conservarlo.
 func (s VehiculoService) ActualizarVehiculo(id primitive.ObjectID, model models.Vehiculo) error {
 	if id.IsZero() {
 		return errors.New("ID inválido")
 	}
 
-	_, err := s.repo.ObtenerVehiculosPorID(s.cfg, id)
+	vehiculoExistente, err := s.repo.ObtenerVehiculosPorID(s.cfg, id)
 	if err != nil {
 		return errors.New("vehículo no encontrado")
 	}
@@ -92,6 +96,7 @@ func (s VehiculoService) ActualizarVehiculo(id primitive.ObjectID, model models.
 		if err != nil {
 			return errors.New("la empresa transportista no existe")
 		}
+		vehiculoExistente.EmpresaTransportistaID = model.EmpresaTransportistaID
 	}
 
 	if model.Patente != "" {
@@ -103,15 +108,23 @@ func (s VehiculoService) ActualizarVehiculo(id primitive.ObjectID, model models.
 		if existente != nil && existente.ID != id {
 			return errors.New("ya existe un vehículo con esa patente")
 		}
+		vehiculoExistente.Patente = model.Patente
+	}
+
+	if model.HabilitacionSenasa != "" {
+		vehiculoExistente.HabilitacionSenasa = model.HabilitacionSenasa
 	}
 
 	if model.Tipo != "" {
 		if err := validarTipoVehiculo(model.Tipo); err != nil {
 			return err
 		}
+		vehiculoExistente.Tipo = model.Tipo
 	}
 
-	return s.repo.ActualizarVehiculo(s.cfg, id, model)
+	vehiculoExistente.TieneCisternaPropia = model.TieneCisternaPropia
+
+	return s.repo.ActualizarVehiculo(s.cfg, id, *vehiculoExistente)
 }
 
 // DesactivarVehiculo realiza la baja lógica del vehículo.

@@ -9,6 +9,7 @@ type Vehiculo struct {
 	Tipo                   TipoVehiculo       `bson:"tipo"`
 	TieneCisternaPropia    bool               `bson:"tiene_cisterna_propia"`
 	EmpresaTransportistaID primitive.ObjectID `bson:"empresa_transportista_id"`
+	Activo                 bool               `bson:"activo"`
 }
 
 type TipoVehiculo string

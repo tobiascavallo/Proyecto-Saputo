@@ -6,6 +6,8 @@ type Usuario struct {
 	ID         primitive.ObjectID `bson:"_id,omitempty"`
 	Nombre     string             `bson:"nombre"`
 	Apellido   string             `bson:"apellido"`
+	DNI        string             `bson:"dni"`
+	Telefono   string             `bson:"telefono"`
 	Email      string             `bson:"email"`
 	Contraseña string             `bson:"contrasena"`
 	Rol        Rol                `bson:"rol"`

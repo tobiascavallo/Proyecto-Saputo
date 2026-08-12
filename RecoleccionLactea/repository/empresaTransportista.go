@@ -33,8 +33,10 @@ func (r EmpresaTransportistaRepositoryImpl) ObtenerEmpresaTransportistaPorId(cfg
 
 func (r EmpresaTransportistaRepositoryImpl) ObtenerEmpresasTransportistas(cfg config.Config) ([]models.EmpresaTransportista, error) {
     collection := db.DB.Database(cfg.MongoDB).Collection("empresas_transportistas")
-    
-    cursor, err := collection.Find(context.TODO(), bson.M{"activo": true})
+
+    // Devuelve activas e inactivas — el frontend filtra por estado en la UI
+    // (mismo criterio que Usuario, que nunca filtró acá).
+    cursor, err := collection.Find(context.TODO(), bson.M{})
     if err != nil {
         return nil, err
     }

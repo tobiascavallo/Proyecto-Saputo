@@ -30,6 +30,7 @@ type VehiculoResponse struct {
 	Tipo                   string `json:"tipo"`
 	TieneCisternaPropia    bool   `json:"tiene_cisterna_propia"`
 	EmpresaTransportistaID string `json:"empresa_transportista_id"`
+	Activo                 bool   `json:"activo"`
 }
 
 func VehiculoToResponse(v models.Vehiculo) VehiculoResponse {
@@ -40,6 +41,7 @@ func VehiculoToResponse(v models.Vehiculo) VehiculoResponse {
 		Tipo:                   string(v.Tipo),
 		TieneCisternaPropia:    v.TieneCisternaPropia,
 		EmpresaTransportistaID: v.EmpresaTransportistaID.Hex(),
+		Activo:                 v.Activo,
 	}
 }
 

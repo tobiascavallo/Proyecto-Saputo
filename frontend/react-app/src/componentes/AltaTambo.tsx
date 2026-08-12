@@ -1,36 +1,28 @@
 import { useState, useEffect, useCallback } from "react";
 import { API_URL, fetchConToken } from "../api";
+import { useDatosReferencia } from "../contextos/DatosReferenciaContext";
+
+const FORM_VACIO = {
+  numero_tambo: "",
+  tambero_id: "",
+};
 
 function AltaTambo() {
+  const { tamberos, invalidarTambos } = useDatosReferencia();
   const [vista, setVista] = useState<"listado" | "nuevo">("listado");
 
-  const [tamberos, setTamberos] = useState<any[]>([]);
   const [tambos, setTambos] = useState<any[]>([]);
   const [cargandoListado, setCargandoListado] = useState(true);
   const [errorListado, setErrorListado] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState<
+    "activos" | "inactivos" | "todos"
+  >("activos");
 
-  const [form, setForm] = useState({
-    numero_tambo: "",
-    tambero_id: "",
-  });
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [form, setForm] = useState(FORM_VACIO);
 
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
-
-  // Traemos los tamberos apenas se abre la pantalla, para llenar el <select>
-  useEffect(() => {
-    async function fetchTamberos() {
-      try {
-        const response = await fetchConToken(`${API_URL}/api/v1/tambero`);
-        const data = await response.json();
-        setTamberos(data || []);
-      } catch (error) {
-        setError("Error al cargar los tamberos");
-      }
-    }
-
-    fetchTamberos();
-  }, []);
 
   const fetchTambos = useCallback(async () => {
     setCargandoListado(true);
@@ -53,10 +45,37 @@ function AltaTambo() {
     fetchTambos();
   }, [fetchTambos]);
 
+  const tambosFiltrados = tambos.filter((t: any) => {
+    if (filtroEstado === "activos") return t.activo;
+    if (filtroEstado === "inactivos") return !t.activo;
+    return true;
+  });
+
+  function iniciarEdicion(tambo: any) {
+    setEditandoId(tambo.id);
+    setForm({
+      numero_tambo: String(tambo.numero_tambo),
+      tambero_id: tambo.tambero_id,
+    });
+    setError("");
+    setExito("");
+    setVista("nuevo");
+  }
+
+  function cancelarEdicion() {
+    setEditandoId(null);
+    setForm(FORM_VACIO);
+    setVista("listado");
+  }
+
   async function handleSubmit() {
     try {
-      const response = await fetchConToken(`${API_URL}/api/v1/tambo`, {
-        method: "POST",
+      const url = editandoId
+        ? `${API_URL}/api/v1/tambo/${editandoId}`
+        : `${API_URL}/api/v1/tambo`;
+
+      const response = await fetchConToken(url, {
+        method: editandoId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           numero_tambo: Number(form.numero_tambo),
@@ -66,16 +85,56 @@ function AltaTambo() {
 
       if (!response.ok) {
         const data = await response.json();
-        setError(data.error || "Error al crear el tambo");
+        setError(
+          data.error ||
+            (editandoId
+              ? "Error al actualizar el tambo"
+              : "Error al crear el tambo"),
+        );
         return;
       }
 
-      setExito("Tambo creado correctamente");
-      setForm({ numero_tambo: "", tambero_id: "" });
+      setExito(
+        editandoId
+          ? "Tambo actualizado correctamente"
+          : "Tambo creado correctamente",
+      );
+      setEditandoId(null);
+      setForm(FORM_VACIO);
       fetchTambos();
+
+      // Solo en el alta: nombreTambo() en Remito.tsx lee el listado de
+      // tambos del contexto compartido, no de este fetch local.
+      if (!editandoId) {
+        invalidarTambos();
+      }
+
       setVista("listado");
     } catch (error) {
       setError("Error al conectar con el servidor");
+    }
+  }
+
+  async function handleDesactivar(tambo: any) {
+    if (!window.confirm(`¿Desactivar el tambo N° ${tambo.numero_tambo}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetchConToken(
+        `${API_URL}/api/v1/tambo/${tambo.id}`,
+        { method: "DELETE" },
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        setErrorListado(data.error || "Error al desactivar el tambo");
+        return;
+      }
+
+      fetchTambos();
+    } catch (error) {
+      setErrorListado("Error al conectar con el servidor");
     }
   }
 
@@ -87,7 +146,11 @@ function AltaTambo() {
         <li className="nav-item">
           <button
             className={`nav-link ${vista === "listado" ? "active" : ""}`}
-            onClick={() => setVista("listado")}
+            onClick={() => {
+              setEditandoId(null);
+              setForm(FORM_VACIO);
+              setVista("listado");
+            }}
           >
             Listado
           </button>
@@ -95,46 +158,92 @@ function AltaTambo() {
         <li className="nav-item">
           <button
             className={`nav-link ${vista === "nuevo" ? "active" : ""}`}
-            onClick={() => setVista("nuevo")}
+            onClick={() => {
+              if (!editandoId) setForm(FORM_VACIO);
+              setVista("nuevo");
+            }}
           >
-            Nuevo tambo
+            {editandoId ? "Editar tambo" : "Nuevo tambo"}
           </button>
         </li>
       </ul>
 
-      {vista === "listado" &&
-        (cargandoListado ? (
-          <p>Cargando tambos...</p>
-        ) : errorListado ? (
-          <p className="text-danger">{errorListado}</p>
-        ) : tambos.length === 0 ? (
-          <p className="text-muted">Todavía no hay tambos cargados.</p>
-        ) : (
-          <table className="table table-striped table-hover">
-            <thead className="table-dark">
-              <tr>
-                <th>N° Tambo</th>
-                <th>Tambero</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tambos.map((tambo: any) => (
-                <tr key={tambo.id}>
-                  <td>{tambo.numero_tambo}</td>
-                  <td>{tambo.tambero_nombre}</td>
-                  <td>
-                    {tambo.activo ? (
-                      <span className="badge bg-success">Activo</span>
-                    ) : (
-                      <span className="badge bg-secondary">Inactivo</span>
-                    )}
-                  </td>
+      {vista === "listado" && (
+        <>
+          <div className="btn-group mb-3">
+            <button
+              className={`btn btn-sm ${filtroEstado === "activos" ? "btn-primary" : "btn-outline-primary"}`}
+              onClick={() => setFiltroEstado("activos")}
+            >
+              Activos
+            </button>
+            <button
+              className={`btn btn-sm ${filtroEstado === "inactivos" ? "btn-primary" : "btn-outline-primary"}`}
+              onClick={() => setFiltroEstado("inactivos")}
+            >
+              Inactivos
+            </button>
+            <button
+              className={`btn btn-sm ${filtroEstado === "todos" ? "btn-primary" : "btn-outline-primary"}`}
+              onClick={() => setFiltroEstado("todos")}
+            >
+              Todos
+            </button>
+          </div>
+
+          {cargandoListado ? (
+            <p>Cargando tambos...</p>
+          ) : errorListado ? (
+            <p className="text-danger">{errorListado}</p>
+          ) : tambosFiltrados.length === 0 ? (
+            <p className="text-muted">No hay tambos para mostrar.</p>
+          ) : (
+            <table className="table table-striped table-hover">
+              <thead className="table-dark">
+                <tr>
+                  <th>N° Tambo</th>
+                  <th>Tambero</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        ))}
+              </thead>
+              <tbody>
+                {tambosFiltrados.map((tambo: any) => (
+                  <tr key={tambo.id}>
+                    <td>{tambo.numero_tambo}</td>
+                    <td>{tambo.tambero_nombre}</td>
+                    <td>
+                      {tambo.activo ? (
+                        <span className="badge bg-success">Activo</span>
+                      ) : (
+                        <span className="badge bg-secondary">Inactivo</span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="d-flex gap-2">
+                        <button
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => iniciarEdicion(tambo)}
+                        >
+                          Editar
+                        </button>
+                        {tambo.activo && (
+                          <button
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => handleDesactivar(tambo)}
+                          >
+                            Desactivar
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
 
       {vista === "nuevo" && (
         <div className="row justify-content-center">
@@ -160,9 +269,22 @@ function AltaTambo() {
               ))}
             </select>
 
-            <button onClick={handleSubmit} className="btn btn-primary w-100">
-              Crear tambo
-            </button>
+            <div className="d-flex gap-2">
+              <button
+                onClick={handleSubmit}
+                className="btn btn-primary flex-grow-1"
+              >
+                {editandoId ? "Guardar cambios" : "Crear tambo"}
+              </button>
+              {editandoId && (
+                <button
+                  className="btn btn-outline-secondary"
+                  onClick={cancelarEdicion}
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
 
             {error && <p className="text-danger mt-2">{error}</p>}
             {exito && <p className="text-success mt-2">{exito}</p>}

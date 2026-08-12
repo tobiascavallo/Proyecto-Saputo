@@ -3,6 +3,7 @@ import Remitos from "./Remito";
 import SolicitudesEdicion from "./SolicitudesEdicion";
 import ResultadosAnalisis from "./ResultadosAnalisis";
 import AltaUsuario from "./AltaUsuario";
+import AltaCamionero from "./AltaCamionero";
 import AltaEmpresaTransportista from "./AltaEmpresaTransportista";
 import AltaVehiculo from "./AltaVehiculo";
 import AltaAcoplado from "./AltaAcoplado";
@@ -47,6 +48,13 @@ function Encargado() {
                   <li
                     className="text-white mb-2"
                     style={{ cursor: "pointer" }}
+                    onClick={() => setSeccionGestion("camioneros")}
+                  >
+                    Camioneros
+                  </li>
+                  <li
+                    className="text-white mb-2"
+                    style={{ cursor: "pointer" }}
                     onClick={() => setSeccionGestion("empresas")}
                   >
                     Empresas transportistas
@@ -84,6 +92,7 @@ function Encargado() {
 
               <div className="col-md-10">
                 {seccionGestion === "usuarios" && <AltaUsuario />}
+                {seccionGestion === "camioneros" && <AltaCamionero />}
                 {seccionGestion === "empresas" && <AltaEmpresaTransportista />}
                 {seccionGestion === "vehiculos" && <AltaVehiculo />}
                 {seccionGestion === "acoplados" && <AltaAcoplado />}

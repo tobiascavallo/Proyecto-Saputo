@@ -68,11 +68,14 @@ func (s AcopladoService) ObtenerAcopladoPorID(id primitive.ObjectID) (*models.Ac
 	return s.repo.ObtenerAcopladoPorID(s.cfg, id)
 }
 
+// ActualizarAcoplado fusiona lo nuevo sobre el registro existente antes de
+// guardar — el repositorio hace un $set del struct completo, así que dejar
+// un campo en su valor cero (incluido "activo") lo pisaría en la base.
 func (s AcopladoService) ActualizarAcoplado(id primitive.ObjectID, model models.Acoplado) error {
 	if id.IsZero() {
 		return errors.New("ID inválido")
 	}
-	_, err := s.repo.ObtenerAcopladoPorID(s.cfg, id)
+	acopladoExistente, err := s.repo.ObtenerAcopladoPorID(s.cfg, id)
 	if err != nil {
 		return errors.New("acoplado no encontrado")
 	}
@@ -82,6 +85,7 @@ func (s AcopladoService) ActualizarAcoplado(id primitive.ObjectID, model models.
 		if err != nil {
 			return errors.New("la empresa transportista no existe")
 		}
+		acopladoExistente.EmpresaTransportistaID = model.EmpresaTransportistaID
 	}
 	if model.Patente != "" {
 		if err := validarPatente(model.Patente); err != nil {
@@ -91,13 +95,18 @@ func (s AcopladoService) ActualizarAcoplado(id primitive.ObjectID, model models.
 		if existente != nil && existente.ID != id {
 			return errors.New("ya existe un acoplado con esa patente")
 		}
+		acopladoExistente.Patente = model.Patente
+	}
+	if model.HabilitacionSenasa != "" {
+		acopladoExistente.HabilitacionSenasa = model.HabilitacionSenasa
 	}
 	if model.Tipo != "" {
 		if err := validarTipoAcoplado(model.Tipo); err != nil {
 			return err
 		}
+		acopladoExistente.Tipo = model.Tipo
 	}
-	return s.repo.ActualizarAcoplado(s.cfg, id, model)
+	return s.repo.ActualizarAcoplado(s.cfg, id, *acopladoExistente)
 }
 
 func (s AcopladoService) DesactivarAcoplado(id primitive.ObjectID) error {

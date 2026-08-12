@@ -19,9 +19,23 @@ func (r RemitoRepositoryImpl) CrearRemito(cfg config.Config, model models.Remito
 	return err
 }
 
-func (r RemitoRepositoryImpl) ObtenerRemitos(cfg config.Config) ([]models.Remito, error) {
+// ObtenerRemitosFiltrados arma un filtro de Mongo dinámicamente a partir de
+// los criterios que vengan seteados en RemitoFiltro (los que sean nil se
+// omiten). Reemplaza los métodos puntuales por cada combinación de filtros
+// — sumar un filtro nuevo (fecha, tambo) es agregar un campo al struct y un
+// `if` acá, sin tocar el resto de las capas.
+func (r RemitoRepositoryImpl) ObtenerRemitosFiltrados(cfg config.Config, filtro models.RemitoFiltro) ([]models.Remito, error) {
 	collection := db.DB.Database(cfg.MongoDB).Collection("remitos")
-	cursor, err := collection.Find(context.TODO(), bson.M{})
+
+	query := bson.M{}
+	if filtro.CamioneroID != nil {
+		query["camionero_id"] = *filtro.CamioneroID
+	}
+	if filtro.Estado != nil {
+		query["estado_remito"] = *filtro.Estado
+	}
+
+	cursor, err := collection.Find(context.TODO(), query)
 	if err != nil {
 		return nil, err
 	}
@@ -40,23 +54,6 @@ func (r RemitoRepositoryImpl) ObtenerRemitoPorID(cfg config.Config, ID primitive
 	return &remito, nil
 }
 
-func (r RemitoRepositoryImpl) ObtenerRemitoPorCamionero(cfg config.Config, camioneroID primitive.ObjectID) ([]models.Remito, error) {
-	collection := db.DB.Database(cfg.MongoDB).Collection("remitos")
-	filter := bson.M{
-		"camionero_id": camioneroID,
-	}
-	cursor, err := collection.Find(context.TODO(), filter)
-	if err != nil {
-		return nil, err
-	}
-	var remitos []models.Remito
-	if err = cursor.All(context.TODO(), &remitos); err != nil {
-		return nil, err
-	}
-
-	return remitos, err
-}
-
 func (r RemitoRepositoryImpl) ActualizarEstadoSincronizacion(cfg config.Config, id primitive.ObjectID, estado models.EstadoSincronizacion) error {
 	collection := db.DB.Database(cfg.MongoDB).Collection("remitos")
 	_, err := collection.UpdateOne(
@@ -67,20 +64,6 @@ func (r RemitoRepositoryImpl) ActualizarEstadoSincronizacion(cfg config.Config, 
 	return err
 }
 
-func (r RemitoRepositoryImpl) ObtenerRemitosPorEstado(cfg config.Config, camioneroID primitive.ObjectID, estado models.EstadoRemito) ([]models.Remito, error) {
-	collection := db.DB.Database(cfg.MongoDB).Collection("remitos")
-	cursor, err := collection.Find(context.TODO(), bson.M{
-		"camionero_id":  camioneroID,
-		"estado_remito": estado,
-	})
-	if err != nil {
-		return nil, err
-	}
-	var remitos []models.Remito
-	err = cursor.All(context.TODO(), &remitos)
-	return remitos, err
-}
-
 func (r RemitoRepositoryImpl) ActualizarEstadoRemito(cfg config.Config, id primitive.ObjectID, estado models.EstadoRemito) error {
 	collection := db.DB.Database(cfg.MongoDB).Collection("remitos")
 	_, err := collection.UpdateOne(
@@ -89,18 +72,4 @@ func (r RemitoRepositoryImpl) ActualizarEstadoRemito(cfg config.Config, id primi
 		bson.M{"$set": bson.M{"estado_remito": estado}},
 	)
 	return err
-}
-
-// ObtenerRemitosPorEstadoGeneral devuelve todos los remitos del sistema que tengan
-// el estado indicado, sin filtrar por camionero. La usa el Encargado/Empleado
-// para ver el estado general de todos los remitos, no solo los propios.
-func (r RemitoRepositoryImpl) ObtenerRemitosPorEstadoGeneral(cfg config.Config, estado models.EstadoRemito) ([]models.Remito, error) {
-	collection := db.DB.Database(cfg.MongoDB).Collection("remitos")
-	cursor, err := collection.Find(context.TODO(), bson.M{"estado_remito": estado})
-	if err != nil {
-		return nil, err
-	}
-	var remitos []models.Remito
-	err = cursor.All(context.TODO(), &remitos)
-	return remitos, err
 }

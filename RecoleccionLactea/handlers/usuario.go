@@ -8,7 +8,7 @@ import (
 )
 
 type UsuarioService interface {
-	CrearUsuario(model models.Usuario) error
+	CrearUsuario(model models.Usuario) (primitive.ObjectID, error)
 	ObtenerUsuarios() ([]models.Usuario, error)
 	ObtenerUsuarioPorID(id primitive.ObjectID) (*models.Usuario, error)
 	ActualizarUsuario(id primitive.ObjectID, model models.Usuario) error
@@ -33,17 +33,20 @@ func (h UsuarioHandler) CrearUsuario(c *gin.Context) {
 	usuario := models.Usuario{
 		Nombre:     req.Nombre,
 		Apellido:   req.Apellido,
+		DNI:        req.DNI,
+		Telefono:   req.Telefono,
 		Email:      req.Email,
 		Contraseña: req.Contrasena,
 		Rol:        models.Rol(req.Rol),
 	}
 
-	if err := h.service.CrearUsuario(usuario); err != nil {
+	id, err := h.service.CrearUsuario(usuario)
+	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(201, gin.H{"mensaje": "usuario creado correctamente"})
+	c.JSON(201, gin.H{"mensaje": "usuario creado correctamente", "id": id.Hex()})
 }
 
 func (h UsuarioHandler) ObtenerUsuarios(c *gin.Context) {
@@ -114,6 +117,8 @@ func (h UsuarioHandler) ActualizarUsuario(c *gin.Context) {
 	usuario := models.Usuario{
 		Nombre:     req.Nombre,
 		Apellido:   req.Apellido,
+		DNI:        req.DNI,
+		Telefono:   req.Telefono,
 		Email:      req.Email,
 		Contraseña: req.Contrasena,
 		Rol:        models.Rol(req.Rol),

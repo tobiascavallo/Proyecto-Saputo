@@ -33,3 +33,12 @@ const (
 	EstadoRemitoEnCurso    EstadoRemito = "en_curso"
 	EstadoRemitoFinalizado EstadoRemito = "finalizado"
 )
+
+// RemitoFiltro agrupa los criterios opcionales para listar remitos. Cada
+// campo nil significa "no filtrar por esto" — se arma dinámicamente en el
+// repository, para poder sumar filtros nuevos (fecha, tambo) sin agregar
+// un método por cada combinación.
+type RemitoFiltro struct {
+	CamioneroID *primitive.ObjectID
+	Estado      *EstadoRemito
+}

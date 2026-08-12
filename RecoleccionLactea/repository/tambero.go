@@ -20,7 +20,8 @@ func (r TamberoRepositoryImpl) CrearTambero(cfg config.Config, model models.Tamb
 
 func (r TamberoRepositoryImpl) ObtenerTamberos(cfg config.Config) ([]models.Tambero, error) {
 	collection := db.DB.Database(cfg.MongoDB).Collection("tamberos")
-	cursor, err := collection.Find(context.TODO(), bson.M{"activo": true})
+	// Devuelve activos e inactivos — el frontend filtra por estado en la UI.
+	cursor, err := collection.Find(context.TODO(), bson.M{})
 	if err != nil {
 		return nil, err
 	}

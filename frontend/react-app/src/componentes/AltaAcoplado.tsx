@@ -1,39 +1,30 @@
 import { useState, useEffect, useCallback } from "react";
 import { API_URL, fetchConToken } from "../api";
+import { useDatosReferencia } from "../contextos/DatosReferenciaContext";
+
+const FORM_VACIO = {
+  patente: "",
+  habilitacion_senasa: "",
+  tipo: "",
+  empresa_transportista_id: "",
+};
 
 function AltaAcoplado() {
+  const { empresas } = useDatosReferencia();
   const [vista, setVista] = useState<"listado" | "nuevo">("listado");
 
-  const [empresas, setEmpresas] = useState<any[]>([]);
   const [acoplados, setAcoplados] = useState<any[]>([]);
   const [cargandoListado, setCargandoListado] = useState(true);
   const [errorListado, setErrorListado] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState<
+    "activos" | "inactivos" | "todos"
+  >("activos");
 
-  const [form, setForm] = useState({
-    patente: "",
-    habilitacion_senasa: "",
-    tipo: "",
-    empresa_transportista_id: "",
-  });
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [form, setForm] = useState(FORM_VACIO);
 
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
-
-  useEffect(() => {
-    async function fetchEmpresas() {
-      try {
-        const response = await fetchConToken(
-          `${API_URL}/api/v1/empresaTransportista`,
-        );
-        const data = await response.json();
-        setEmpresas(data || []);
-      } catch (error) {
-        setError("Error al cargar las empresas transportistas");
-      }
-    }
-
-    fetchEmpresas();
-  }, []);
 
   const fetchAcoplados = useCallback(async () => {
     setCargandoListado(true);
@@ -56,6 +47,12 @@ function AltaAcoplado() {
     fetchAcoplados();
   }, [fetchAcoplados]);
 
+  const acopladosFiltrados = acoplados.filter((a: any) => {
+    if (filtroEstado === "activos") return a.activo;
+    if (filtroEstado === "inactivos") return !a.activo;
+    return true;
+  });
+
   function nombreEmpresa(id: string) {
     const empresa = empresas.find((e: any) => e.id === id);
     return empresa ? empresa.nombre : id;
@@ -67,31 +64,82 @@ function AltaAcoplado() {
     return tipo;
   }
 
+  function iniciarEdicion(acoplado: any) {
+    setEditandoId(acoplado.id);
+    setForm({
+      patente: acoplado.patente,
+      habilitacion_senasa: acoplado.habilitacion_senasa,
+      tipo: acoplado.tipo,
+      empresa_transportista_id: acoplado.empresa_transportista_id,
+    });
+    setError("");
+    setExito("");
+    setVista("nuevo");
+  }
+
+  function cancelarEdicion() {
+    setEditandoId(null);
+    setForm(FORM_VACIO);
+    setVista("listado");
+  }
+
   async function handleSubmit() {
     try {
-      const response = await fetchConToken(`${API_URL}/api/v1/acoplado`, {
-        method: "POST",
+      const url = editandoId
+        ? `${API_URL}/api/v1/acoplado/${editandoId}`
+        : `${API_URL}/api/v1/acoplado`;
+
+      const response = await fetchConToken(url, {
+        method: editandoId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
 
       if (!response.ok) {
         const data = await response.json();
-        setError(data.error || "Error al crear el acoplado");
+        setError(
+          data.error ||
+            (editandoId
+              ? "Error al actualizar el acoplado"
+              : "Error al crear el acoplado"),
+        );
         return;
       }
 
-      setExito("Acoplado creado correctamente");
-      setForm({
-        patente: "",
-        habilitacion_senasa: "",
-        tipo: "",
-        empresa_transportista_id: "",
-      });
+      setExito(
+        editandoId
+          ? "Acoplado actualizado correctamente"
+          : "Acoplado creado correctamente",
+      );
+      setEditandoId(null);
+      setForm(FORM_VACIO);
       fetchAcoplados();
       setVista("listado");
     } catch (error) {
       setError("Error al conectar con el servidor");
+    }
+  }
+
+  async function handleDesactivar(acoplado: any) {
+    if (!window.confirm(`¿Desactivar el acoplado ${acoplado.patente}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetchConToken(
+        `${API_URL}/api/v1/acoplado/${acoplado.id}`,
+        { method: "DELETE" },
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        setErrorListado(data.error || "Error al desactivar el acoplado");
+        return;
+      }
+
+      fetchAcoplados();
+    } catch (error) {
+      setErrorListado("Error al conectar con el servidor");
     }
   }
 
@@ -103,7 +151,11 @@ function AltaAcoplado() {
         <li className="nav-item">
           <button
             className={`nav-link ${vista === "listado" ? "active" : ""}`}
-            onClick={() => setVista("listado")}
+            onClick={() => {
+              setEditandoId(null);
+              setForm(FORM_VACIO);
+              setVista("listado");
+            }}
           >
             Listado
           </button>
@@ -111,50 +163,96 @@ function AltaAcoplado() {
         <li className="nav-item">
           <button
             className={`nav-link ${vista === "nuevo" ? "active" : ""}`}
-            onClick={() => setVista("nuevo")}
+            onClick={() => {
+              if (!editandoId) setForm(FORM_VACIO);
+              setVista("nuevo");
+            }}
           >
-            Nuevo acoplado
+            {editandoId ? "Editar acoplado" : "Nuevo acoplado"}
           </button>
         </li>
       </ul>
 
-      {vista === "listado" &&
-        (cargandoListado ? (
-          <p>Cargando acoplados...</p>
-        ) : errorListado ? (
-          <p className="text-danger">{errorListado}</p>
-        ) : acoplados.length === 0 ? (
-          <p className="text-muted">Todavía no hay acoplados cargados.</p>
-        ) : (
-          <table className="table table-striped table-hover">
-            <thead className="table-dark">
-              <tr>
-                <th>Patente</th>
-                <th>Habilitación SENASA</th>
-                <th>Tipo</th>
-                <th>Empresa transportista</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {acoplados.map((acoplado: any) => (
-                <tr key={acoplado.id}>
-                  <td>{acoplado.patente}</td>
-                  <td>{acoplado.habilitacion_senasa}</td>
-                  <td>{nombreTipo(acoplado.tipo)}</td>
-                  <td>{nombreEmpresa(acoplado.empresa_transportista_id)}</td>
-                  <td>
-                    {acoplado.activo ? (
-                      <span className="badge bg-success">Activo</span>
-                    ) : (
-                      <span className="badge bg-secondary">Inactivo</span>
-                    )}
-                  </td>
+      {vista === "listado" && (
+        <>
+          <div className="btn-group mb-3">
+            <button
+              className={`btn btn-sm ${filtroEstado === "activos" ? "btn-primary" : "btn-outline-primary"}`}
+              onClick={() => setFiltroEstado("activos")}
+            >
+              Activos
+            </button>
+            <button
+              className={`btn btn-sm ${filtroEstado === "inactivos" ? "btn-primary" : "btn-outline-primary"}`}
+              onClick={() => setFiltroEstado("inactivos")}
+            >
+              Inactivos
+            </button>
+            <button
+              className={`btn btn-sm ${filtroEstado === "todos" ? "btn-primary" : "btn-outline-primary"}`}
+              onClick={() => setFiltroEstado("todos")}
+            >
+              Todos
+            </button>
+          </div>
+
+          {cargandoListado ? (
+            <p>Cargando acoplados...</p>
+          ) : errorListado ? (
+            <p className="text-danger">{errorListado}</p>
+          ) : acopladosFiltrados.length === 0 ? (
+            <p className="text-muted">No hay acoplados para mostrar.</p>
+          ) : (
+            <table className="table table-striped table-hover">
+              <thead className="table-dark">
+                <tr>
+                  <th>Patente</th>
+                  <th>Habilitación SENASA</th>
+                  <th>Tipo</th>
+                  <th>Empresa transportista</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        ))}
+              </thead>
+              <tbody>
+                {acopladosFiltrados.map((acoplado: any) => (
+                  <tr key={acoplado.id}>
+                    <td>{acoplado.patente}</td>
+                    <td>{acoplado.habilitacion_senasa}</td>
+                    <td>{nombreTipo(acoplado.tipo)}</td>
+                    <td>{nombreEmpresa(acoplado.empresa_transportista_id)}</td>
+                    <td>
+                      {acoplado.activo ? (
+                        <span className="badge bg-success">Activo</span>
+                      ) : (
+                        <span className="badge bg-secondary">Inactivo</span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="d-flex gap-2">
+                        <button
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => iniciarEdicion(acoplado)}
+                        >
+                          Editar
+                        </button>
+                        {acoplado.activo && (
+                          <button
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => handleDesactivar(acoplado)}
+                          >
+                            Desactivar
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
 
       {vista === "nuevo" && (
         <div className="row justify-content-center">
@@ -200,9 +298,22 @@ function AltaAcoplado() {
               ))}
             </select>
 
-            <button onClick={handleSubmit} className="btn btn-primary w-100">
-              Crear acoplado
-            </button>
+            <div className="d-flex gap-2">
+              <button
+                onClick={handleSubmit}
+                className="btn btn-primary flex-grow-1"
+              >
+                {editandoId ? "Guardar cambios" : "Crear acoplado"}
+              </button>
+              {editandoId && (
+                <button
+                  className="btn btn-outline-secondary"
+                  onClick={cancelarEdicion}
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
 
             {error && <p className="text-danger mt-2">{error}</p>}
             {exito && <p className="text-success mt-2">{exito}</p>}

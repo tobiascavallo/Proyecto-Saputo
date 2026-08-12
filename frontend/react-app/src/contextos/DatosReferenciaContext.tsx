@@ -33,12 +33,41 @@ interface TamboRef {
   tambero_nombre: string;
 }
 
+interface EmpresaRef {
+  id: string;
+  nombre: string;
+  cuit: string;
+  domicilio: string;
+  activo: boolean;
+}
+
+interface TamberoRef {
+  id: string;
+  nombre: string;
+  cuit: string;
+  telefono: string;
+  email: string;
+  activo: boolean;
+}
+
 export interface UsuarioBasico {
   id: string;
   nombre: string;
   apellido: string;
+  dni: string;
+  telefono: string;
   email: string;
   rol: string;
+}
+
+export interface CamioneroBasico {
+  id: string;
+  usuario_id: string;
+  usuario_nombre: string;
+  usuario_dni: string;
+  usuario_telefono: string;
+  empresa_transportista_id: string;
+  empresa_transportista_nombre: string;
 }
 
 interface DatosReferenciaValor {
@@ -46,6 +75,33 @@ interface DatosReferenciaValor {
   // null = no se pudo cargar el listado completo (sin permiso para este rol)
   nombreUsuario: (id: string) => string | null;
   obtenerUsuarioBasico: (id: string) => Promise<UsuarioBasico | null>;
+  // Devuelve null tanto si hubo un error como si el camionero todavía no
+  // completó sus datos — en ambos casos, la UI debe mostrar "sin datos
+  // completados" en vez de romper.
+  obtenerCamioneroPorUsuario: (usuarioId: string) => Promise<CamioneroBasico | null>;
+  // Saca a un usuario del caché de camionero — se llama después de crear un
+  // registro de Camionero, para que el próximo "Ver detalle" en la misma
+  // sesión pida el dato de nuevo en vez de reusar el "sin datos completados"
+  // que se pudo haber cacheado antes.
+  invalidarCamionero: (usuarioId: string) => void;
+  // Vuelve a pedir el listado de usuarios — se llama después de crear un
+  // usuario nuevo, para que aparezca con su nombre resuelto (en vez de ID
+  // crudo) en Remitos/Solicitudes sin esperar a un refresco manual de
+  // página. No hace nada si el rol logueado no tiene acceso a ese listado
+  // (empleado).
+  invalidarUsuarios: () => void;
+  // Listado completo de empresas transportistas — lo consumen los <select>
+  // de AltaVehiculo.tsx y AltaAcoplado.tsx, para no pedirlo cada uno por su
+  // cuenta y para que ambos vean una empresa recién creada sin recargar.
+  empresas: EmpresaRef[];
+  invalidarEmpresas: () => void;
+  // Listado completo de tamberos — lo consume el <select> de AltaTambo.tsx.
+  tamberos: TamberoRef[];
+  invalidarTamberos: () => void;
+  // Vuelve a pedir el listado de tambos — se llama después de crear un
+  // tambo nuevo, para que nombreTambo() lo resuelva en Remito.tsx sin
+  // esperar a un refresco manual.
+  invalidarTambos: () => void;
 }
 
 const DatosReferenciaContext = createContext<DatosReferenciaValor | null>(
@@ -69,36 +125,74 @@ export function DatosReferenciaProvider({
 }) {
   const [tambos, setTambos] = useState<TamboRef[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioRef[] | null>(null);
+  const [empresas, setEmpresas] = useState<EmpresaRef[]>([]);
+  const [tamberos, setTamberos] = useState<TamberoRef[]>([]);
   const [basicosCache, setBasicosCache] = useState<
     Record<string, UsuarioBasico>
   >({});
+  // El valor cacheado es null cuando ya se pidió y el camionero no tiene
+  // datos completados (o falló) — distinto de "todavía no se pidió", que es
+  // cuando la clave ni siquiera está presente en el objeto.
+  const [camionerosCache, setCamionerosCache] = useState<
+    Record<string, CamioneroBasico | null>
+  >({});
+
+  // Extraído a useCallback (en vez de vivir solo dentro del useEffect) para
+  // poder reusarlo desde invalidarUsuarios() y forzar un refetch real, no
+  // solo limpiar el estado y esperar a que algo más lo vuelva a pedir.
+  const cargarUsuarios = useCallback(async () => {
+    if (rolDesdeToken() !== "encargado") return;
+
+    try {
+      const response = await fetchConToken(`${API_URL}/api/v1/usuario`);
+      if (!response.ok) return;
+      setUsuarios((await response.json()) || []);
+    } catch {
+      // Sin lista de usuarios, se cae al detalle bajo demanda.
+    }
+  }, []);
+
+  // Mismo criterio que cargarUsuarios: se extraen a useCallback para poder
+  // reusarlos desde las funciones invalidarX() y forzar un refetch real.
+  const cargarTambos = useCallback(async () => {
+    try {
+      const response = await fetchConToken(`${API_URL}/api/v1/tambo`);
+      if (!response.ok) return;
+      setTambos((await response.json()) || []);
+    } catch {
+      // Sin datos de referencia el fallback es mostrar el ID crudo.
+    }
+  }, []);
+
+  const cargarEmpresas = useCallback(async () => {
+    try {
+      const response = await fetchConToken(
+        `${API_URL}/api/v1/empresaTransportista`,
+      );
+      if (!response.ok) return;
+      setEmpresas((await response.json()) || []);
+    } catch {
+      // Sin datos de referencia, los <select> que dependen de esto quedan
+      // vacíos — cada componente ya maneja ese caso mostrando su propio error.
+    }
+  }, []);
+
+  const cargarTamberos = useCallback(async () => {
+    try {
+      const response = await fetchConToken(`${API_URL}/api/v1/tambero`);
+      if (!response.ok) return;
+      setTamberos((await response.json()) || []);
+    } catch {
+      // Idem cargarEmpresas.
+    }
+  }, []);
 
   useEffect(() => {
-    async function cargarTambos() {
-      try {
-        const response = await fetchConToken(`${API_URL}/api/v1/tambo`);
-        if (!response.ok) return;
-        setTambos((await response.json()) || []);
-      } catch {
-        // Sin datos de referencia el fallback es mostrar el ID crudo.
-      }
-    }
-
-    async function cargarUsuarios() {
-      if (rolDesdeToken() !== "encargado") return;
-
-      try {
-        const response = await fetchConToken(`${API_URL}/api/v1/usuario`);
-        if (!response.ok) return;
-        setUsuarios((await response.json()) || []);
-      } catch {
-        // Sin lista de usuarios, se cae al detalle bajo demanda.
-      }
-    }
-
     cargarTambos();
     cargarUsuarios();
-  }, []);
+    cargarEmpresas();
+    cargarTamberos();
+  }, [cargarTambos, cargarUsuarios, cargarEmpresas, cargarTamberos]);
 
   const nombreTambo = useCallback(
     (id: string) => {
@@ -139,9 +233,80 @@ export function DatosReferenciaProvider({
     [basicosCache],
   );
 
+  const obtenerCamioneroPorUsuario = useCallback(
+    async (usuarioId: string) => {
+      if (usuarioId in camionerosCache) return camionerosCache[usuarioId];
+
+      try {
+        const response = await fetchConToken(
+          `${API_URL}/api/v1/camionero/usuario/${usuarioId}`,
+        );
+        if (!response.ok) {
+          setCamionerosCache((actual) => ({ ...actual, [usuarioId]: null }));
+          return null;
+        }
+
+        const datos: CamioneroBasico = await response.json();
+        setCamionerosCache((actual) => ({ ...actual, [usuarioId]: datos }));
+        return datos;
+      } catch {
+        return null;
+      }
+    },
+    [camionerosCache],
+  );
+
+  const invalidarCamionero = useCallback((usuarioId: string) => {
+    setCamionerosCache((actual) => {
+      if (!(usuarioId in actual)) return actual;
+      const { [usuarioId]: _quitado, ...resto } = actual;
+      return resto;
+    });
+  }, []);
+
+  const invalidarUsuarios = useCallback(() => {
+    cargarUsuarios();
+  }, [cargarUsuarios]);
+
+  const invalidarEmpresas = useCallback(() => {
+    cargarEmpresas();
+  }, [cargarEmpresas]);
+
+  const invalidarTamberos = useCallback(() => {
+    cargarTamberos();
+  }, [cargarTamberos]);
+
+  const invalidarTambos = useCallback(() => {
+    cargarTambos();
+  }, [cargarTambos]);
+
   const valor = useMemo(
-    () => ({ nombreTambo, nombreUsuario, obtenerUsuarioBasico }),
-    [nombreTambo, nombreUsuario, obtenerUsuarioBasico],
+    () => ({
+      nombreTambo,
+      nombreUsuario,
+      obtenerUsuarioBasico,
+      obtenerCamioneroPorUsuario,
+      invalidarCamionero,
+      invalidarUsuarios,
+      empresas,
+      invalidarEmpresas,
+      tamberos,
+      invalidarTamberos,
+      invalidarTambos,
+    }),
+    [
+      nombreTambo,
+      nombreUsuario,
+      obtenerUsuarioBasico,
+      obtenerCamioneroPorUsuario,
+      invalidarCamionero,
+      invalidarUsuarios,
+      empresas,
+      invalidarEmpresas,
+      tamberos,
+      invalidarTamberos,
+      invalidarTambos,
+    ],
   );
 
   return (

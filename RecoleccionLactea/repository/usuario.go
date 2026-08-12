@@ -50,6 +50,16 @@ func (r UsuarioRepositoryImpl) ObtenerUsuarioPorEmail(cfg config.Config, email s
 	return &usuario, nil
 }
 
+func (r UsuarioRepositoryImpl) ObtenerUsuarioPorDNI(cfg config.Config, dni string) (*models.Usuario, error) {
+	collection := db.DB.Database(cfg.MongoDB).Collection("usuarios")
+	var usuario models.Usuario
+	err := collection.FindOne(context.TODO(), bson.M{"dni": dni}).Decode(&usuario)
+	if err != nil {
+		return nil, err
+	}
+	return &usuario, nil
+}
+
 func (r UsuarioRepositoryImpl) ActualizarUsuario(cfg config.Config, id primitive.ObjectID, model models.Usuario) error {
 	collection := db.DB.Database(cfg.MongoDB).Collection("usuarios")
 	_, err := collection.UpdateOne(

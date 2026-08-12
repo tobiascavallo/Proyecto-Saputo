@@ -72,21 +72,31 @@ func (s EmpresaTransportistaService) ObtenerEmpresaTransportistaPorId(id primiti
 	return &empresa, nil
 }
 
+// ActualizarEmpresaTransportista fusiona lo nuevo sobre el registro
+// existente antes de guardar — el repositorio setea nombre/cuit/domicilio
+// completos, así que dejar un campo vacío lo pisaría en la base en vez de
+// conservar el valor actual.
 func (s EmpresaTransportistaService) ActualizarEmpresaTransportista(id primitive.ObjectID, model models.EmpresaTransportista) error {
 	if id.IsZero() {
 		return fmt.Errorf("ID inválido")
 	}
 
-	_, err := s.repo.ObtenerEmpresaTransportistaPorId(s.cfg, id)
+	empresaExistente, err := s.repo.ObtenerEmpresaTransportistaPorId(s.cfg, id)
 	if err != nil {
 		return fmt.Errorf("empresa transportista no encontrada")
 	}
 
-	if model.Nombre != "" && strings.TrimSpace(model.Nombre) == "" {
-		return fmt.Errorf("el nombre no puede ser solo espacios")
+	if model.Nombre != "" {
+		if strings.TrimSpace(model.Nombre) == "" {
+			return fmt.Errorf("el nombre no puede ser solo espacios")
+		}
+		empresaExistente.Nombre = model.Nombre
 	}
-	if model.Domicilio != "" && strings.TrimSpace(model.Domicilio) == "" {
-		return fmt.Errorf("el domicilio no puede ser solo espacios")
+	if model.Domicilio != "" {
+		if strings.TrimSpace(model.Domicilio) == "" {
+			return fmt.Errorf("el domicilio no puede ser solo espacios")
+		}
+		empresaExistente.Domicilio = model.Domicilio
 	}
 	if model.Cuit != "" {
 		valido, err := ValidarCuitEmpresa(model.Cuit)
@@ -96,9 +106,10 @@ func (s EmpresaTransportistaService) ActualizarEmpresaTransportista(id primitive
 		if !valido {
 			return fmt.Errorf("el cuit no es válido")
 		}
+		empresaExistente.Cuit = model.Cuit
 	}
 
-	return s.repo.ActualizarEmpresaTransportista(s.cfg, id, model)
+	return s.repo.ActualizarEmpresaTransportista(s.cfg, id, empresaExistente)
 }
 
 func (s EmpresaTransportistaService) DesactivarEmpresaTransportista(id primitive.ObjectID) error {
