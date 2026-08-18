@@ -14,6 +14,7 @@ type CamioneroService interface {
 	ObtenerCamioneroPorUsuarioID(usuarioID primitive.ObjectID) (*models.Camionero, error)
 	ActualizarCamionero(id primitive.ObjectID, model models.Camionero) error
 	DesactivarCamionero(id primitive.ObjectID) error
+	ActivarCamionero(id primitive.ObjectID) error
 	ObtenerDatosUsuario(usuarioID primitive.ObjectID) (nombre string, dni string, telefono string)
 	ObtenerNombreEmpresa(empresaID primitive.ObjectID) string
 }
@@ -127,6 +128,21 @@ func (h CamioneroHandler) DesactivarCamionero(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"mensaje": "camionero desactivado correctamente"})
+}
+
+func (h CamioneroHandler) ActivarCamionero(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	if err := h.service.ActivarCamionero(id); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"mensaje": "camionero activado correctamente"})
 }
 
 func (h CamioneroHandler) ObtenerCamioneroPorUsuarioID(c *gin.Context) {

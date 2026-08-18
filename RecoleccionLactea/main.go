@@ -53,6 +53,7 @@ func main() {
 		usuario.GET("/:id/basico", middleware.RequiereRol("empleado", "encargado"), usuarioHandler.ObtenerUsuarioBasico)
 		usuario.PUT("/:id", middleware.RequiereRol("encargado"), usuarioHandler.ActualizarUsuario)
 		usuario.DELETE("/:id", middleware.RequiereRol("encargado"), usuarioHandler.DesactivarUsuario)
+		usuario.PATCH("/:id/activar", middleware.RequiereRol("encargado"), usuarioHandler.ActivarUsuario)
 	}
 
 	empresaRepo := repository.EmpresaTransportistaRepositoryImpl{}
@@ -67,6 +68,7 @@ func main() {
 		empresa.GET("/:id", empresaHandler.ObtenerEmpresaTransportistaPorId)
 		empresa.PUT("/:id", middleware.RequiereRol("encargado"), empresaHandler.ActualizarEmpresaTransportista)
 		empresa.DELETE("/:id", middleware.RequiereRol("encargado"), empresaHandler.DesactivarEmpresaTransportista)
+		empresa.PATCH("/:id/activar", middleware.RequiereRol("encargado"), empresaHandler.ActivarEmpresaTransportista)
 	}
 
 	camioneroRepo := repository.CamioneroRepositoryImpl{}
@@ -82,6 +84,7 @@ func main() {
 		camionero.GET("/usuario/:usuarioId", middleware.RequiereRol("encargado", "empleado"), camioneroHandler.ObtenerCamioneroPorUsuarioID)
 		camionero.PUT("/:id", middleware.RequiereRol("encargado"), camioneroHandler.ActualizarCamionero)
 		camionero.DELETE("/:id", middleware.RequiereRol("encargado"), camioneroHandler.DesactivarCamionero)
+		camionero.PATCH("/:id/activar", middleware.RequiereRol("encargado"), camioneroHandler.ActivarCamionero)
 	}
 
 	vehiculoRepo := repository.VehiculoRepositoryImpl{}
@@ -96,6 +99,7 @@ func main() {
 		vehiculo.GET("/:id", vehiculoHandler.ObtenerVehiculoPorID)
 		vehiculo.PUT("/:id", middleware.RequiereRol("encargado"), vehiculoHandler.ActualizarVehiculo)
 		vehiculo.DELETE("/:id", middleware.RequiereRol("encargado"), vehiculoHandler.DesactivarVehiculo)
+		vehiculo.PATCH("/:id/activar", middleware.RequiereRol("encargado"), vehiculoHandler.ActivarVehiculo)
 		vehiculo.GET("/empresaTransportista/:id", vehiculoHandler.ObtenerVehiculosPorEmpresa)
 	}
 
@@ -111,6 +115,7 @@ func main() {
 		acoplado.GET("/:id", acopladoHandler.ObtenerAcopladoPorID)
 		acoplado.PUT("/:id", middleware.RequiereRol("encargado"), acopladoHandler.ActualizarAcoplado)
 		acoplado.DELETE("/:id", middleware.RequiereRol("encargado"), acopladoHandler.DesactivarAcoplado)
+		acoplado.PATCH("/:id/activar", middleware.RequiereRol("encargado"), acopladoHandler.ActivarAcoplado)
 		acoplado.GET("/empresaTransportista/:id", acopladoHandler.ObtenerAcopladosPorEmpresa)
 	}
 
@@ -129,6 +134,7 @@ func main() {
 		tambero.GET("/telefono/:telefono", tamberoHandler.ObtenerTamberoPorTelefono)
 		tambero.PATCH("/:id", middleware.RequiereRol("encargado"), tamberoHandler.ActualizarTambero)
 		tambero.DELETE("/:id", middleware.RequiereRol("encargado"), tamberoHandler.DesactivarTambero)
+		tambero.PATCH("/:id/activar", middleware.RequiereRol("encargado"), tamberoHandler.ActivarTambero)
 	}
 
 	tamboRepo := repository.TamboRepositoryImpl{}
@@ -145,6 +151,7 @@ func main() {
 		tambo.GET("/tambero/:tamberoId", tamboHandler.ObtenerTambosPorTambero)
 		tambo.PATCH("/:id", middleware.RequiereRol("encargado"), tamboHandler.ActualizarTambo)
 		tambo.DELETE("/:id", middleware.RequiereRol("encargado"), tamboHandler.DesactivarTambo)
+		tambo.PATCH("/:id/activar", middleware.RequiereRol("encargado"), tamboHandler.ActivarTambo)
 	}
 	// Hub de eventos en tiempo real (SSE). Se crea antes que los services que
 	// lo van a usar para notificar (Remito, ResultadoAnalisis, SolicitudEdicion).

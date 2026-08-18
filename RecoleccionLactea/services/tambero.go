@@ -20,6 +20,7 @@ type TamberoRepository interface {
 	ObtenerTamberoPorTelefono(cfg config.Config, telefono string) (*models.Tambero, error)
 	ActualizarTambero(cfg config.Config, id primitive.ObjectID, model models.Tambero) error
 	DesactivarTambero(cfg config.Config, id primitive.ObjectID) error
+	ActivarTambero(cfg config.Config, id primitive.ObjectID) error
 }
 
 type TamberoService struct {
@@ -162,4 +163,21 @@ func (s TamberoService) DesactivarTambero(id primitive.ObjectID) error {
 		return errors.New("el tambero no existe")
 	}
 	return s.repo.DesactivarTambero(s.cfg, id)
+}
+
+// ActivarTambero revierte una baja lógica. El CUIT/email/teléfono siguen
+// siendo únicos globalmente (no filtran por activo), así que no hay riesgo
+// de colisión al reactivar.
+func (s TamberoService) ActivarTambero(id primitive.ObjectID) error {
+	if id.IsZero() {
+		return errors.New("ID inválido")
+	}
+	tamberoExiste, err := s.repo.ObtenerTamberoPorID(s.cfg, id)
+	if err != nil {
+		return err
+	}
+	if tamberoExiste == nil {
+		return errors.New("el tambero no existe")
+	}
+	return s.repo.ActivarTambero(s.cfg, id)
 }

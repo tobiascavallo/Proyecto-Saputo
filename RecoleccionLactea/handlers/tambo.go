@@ -17,6 +17,7 @@ type TamboService interface {
 	ObtenerTamboPorNumeroTambo(numero int) (*models.Tambo, error)
 	ActualizarTambo(id primitive.ObjectID, model models.Tambo) error
 	DesactivarTambo(id primitive.ObjectID) error
+	ActivarTambo(id primitive.ObjectID) error
 }
 
 type TamboHandler struct {
@@ -171,4 +172,19 @@ func (h TamboHandler) DesactivarTambo(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"mensaje": "tambo desactivado correctamente"})
+}
+
+func (h TamboHandler) ActivarTambo(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	if err := h.service.ActivarTambo(id); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"mensaje": "tambo activado correctamente"})
 }

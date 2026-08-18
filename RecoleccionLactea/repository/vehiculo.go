@@ -60,6 +60,16 @@ func (r VehiculoRepositoryImpl) DesactivarVehiculo(cfg config.Config, id primiti
 	return err
 }
 
+func (r VehiculoRepositoryImpl) ActivarVehiculo(cfg config.Config, id primitive.ObjectID) error {
+	collection := db.DB.Database(cfg.MongoDB).Collection("vehiculos")
+	_, err := collection.UpdateOne(
+		context.TODO(),
+		bson.M{"_id": id},
+		bson.M{"$set": bson.M{"activo": true}},
+	)
+	return err
+}
+
 func (r VehiculoRepositoryImpl) ObtenerVehiculosPorEmpresa(cfg config.Config, empresaID primitive.ObjectID) ([]models.Vehiculo, error) {
 	collection := db.DB.Database(cfg.MongoDB).Collection("vehiculos")
 	cursor, err := collection.Find(context.TODO(), bson.M{"empresa_transportista_id": empresaID})

@@ -133,7 +133,36 @@ function AltaTambero() {
         return;
       }
 
-      fetchTamberos();
+      setTamberos((actuales) =>
+        actuales.map((t) =>
+          t.id === tambero.id ? { ...t, activo: false } : t,
+        ),
+      );
+    } catch (error) {
+      setErrorListado("Error al conectar con el servidor");
+    }
+  }
+
+  async function handleActivar(tambero: any) {
+    if (!window.confirm(`¿Reactivar a ${tambero.nombre}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetchConToken(
+        `${API_URL}/api/v1/tambero/${tambero.id}/activar`,
+        { method: "PATCH" },
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        setErrorListado(data.error || "Error al reactivar el tambero");
+        return;
+      }
+
+      setTamberos((actuales) =>
+        actuales.map((t) => (t.id === tambero.id ? { ...t, activo: true } : t)),
+      );
     } catch (error) {
       setErrorListado("Error al conectar con el servidor");
     }
@@ -232,12 +261,19 @@ function AltaTambero() {
                         >
                           Editar
                         </button>
-                        {tambero.activo && (
+                        {tambero.activo ? (
                           <button
                             className="btn btn-sm btn-outline-danger"
                             onClick={() => handleDesactivar(tambero)}
                           >
                             Desactivar
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => handleActivar(tambero)}
+                          >
+                            Reactivar
                           </button>
                         )}
                       </div>

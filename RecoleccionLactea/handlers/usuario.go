@@ -13,6 +13,7 @@ type UsuarioService interface {
 	ObtenerUsuarioPorID(id primitive.ObjectID) (*models.Usuario, error)
 	ActualizarUsuario(id primitive.ObjectID, model models.Usuario) error
 	DesactivarUsuario(id primitive.ObjectID) error
+	ActivarUsuario(id primitive.ObjectID) error
 }
 
 type UsuarioHandler struct {
@@ -121,7 +122,6 @@ func (h UsuarioHandler) ActualizarUsuario(c *gin.Context) {
 		Telefono:   req.Telefono,
 		Email:      req.Email,
 		Contraseña: req.Contrasena,
-		Rol:        models.Rol(req.Rol),
 	}
 
 	if err := h.service.ActualizarUsuario(id, usuario); err != nil {
@@ -145,4 +145,19 @@ func (h UsuarioHandler) DesactivarUsuario(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"mensaje": "usuario desactivado correctamente"})
+}
+
+func (h UsuarioHandler) ActivarUsuario(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	if err := h.service.ActivarUsuario(id); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"mensaje": "usuario activado correctamente"})
 }

@@ -13,6 +13,7 @@ type AcopladoService interface {
 	ObtenerAcopladoPorID(id primitive.ObjectID) (*models.Acoplado, error)
 	ActualizarAcoplado(id primitive.ObjectID, model models.Acoplado) error
 	DesactivarAcoplado(id primitive.ObjectID) error
+	ActivarAcoplado(id primitive.ObjectID) error
 	ObtenerAcopladosPorEmpresa(empresaID primitive.ObjectID) ([]models.Acoplado, error)
 }
 
@@ -116,6 +117,21 @@ func (h AcopladoHandler) DesactivarAcoplado(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"mensaje": "acoplado desactivado correctamente"})
+}
+
+func (h AcopladoHandler) ActivarAcoplado(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	if err := h.service.ActivarAcoplado(id); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"mensaje": "acoplado activado correctamente"})
 }
 
 func (h AcopladoHandler) ObtenerAcopladosPorEmpresa(c *gin.Context) {

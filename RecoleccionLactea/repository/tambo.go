@@ -99,3 +99,13 @@ func (r TamboRepositoryImpl) DesactivarTambo(cfg config.Config, id primitive.Obj
 	)
 	return err
 }
+
+func (r TamboRepositoryImpl) ActivarTambo(cfg config.Config, id primitive.ObjectID) error {
+	collection := db.DB.Database(cfg.MongoDB).Collection("tambos")
+	_, err := collection.UpdateOne(
+		context.TODO(),
+		bson.M{"_id": id},
+		bson.M{"$set": bson.M{"activo": true}},
+	)
+	return err
+}

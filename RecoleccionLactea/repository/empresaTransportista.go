@@ -75,3 +75,16 @@ func (r EmpresaTransportistaRepositoryImpl) DesactivarEmpresaTransportista(cfg c
     }
     return nil
 }
+
+func (r EmpresaTransportistaRepositoryImpl) ActivarEmpresaTransportista(cfg config.Config, id primitive.ObjectID) error {
+    collection := db.DB.Database(cfg.MongoDB).Collection("empresas_transportistas")
+
+    result, err := collection.UpdateOne(context.TODO(), bson.M{"_id": id}, bson.M{"$set": bson.M{"activo": true}})
+    if err != nil {
+        return err
+    }
+    if result.MatchedCount == 0 {
+        return fmt.Errorf("no se encontró ninguna empresa transportista con id %s", id.Hex())
+    }
+    return nil
+}

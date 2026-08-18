@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { API_URL, fetchConToken } from "../api";
 import { useEventosSSE } from "../sse";
 import { useDatosReferencia } from "../contextos/DatosReferenciaContext";
@@ -26,6 +26,17 @@ function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
   const [lineasDelRemito, setLineasDelRemito] = useState<any[]>([]);
   const [resultados, setResultados] = useState<any[]>([]);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
+
+  // Búsqueda por código de muestra (lector de barcode USB) — solo tiene
+  // sentido en la vista global, no cuando Remito.tsx está acotado a un
+  // camionero puntual (ver prop camioneroId).
+  const [codigoBusqueda, setCodigoBusqueda] = useState("");
+  const [buscandoCodigo, setBuscandoCodigo] = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState("");
+  const [lineaResaltadaId, setLineaResaltadaId] = useState<string | null>(
+    null,
+  );
+  const inputBusquedaRef = useRef<HTMLInputElement>(null);
 
   // Trae los remitos según el filtro activo. Se reusa tanto para el efecto
   // que depende de "filtroEstado" como para el refresco disparado por SSE.
@@ -68,9 +79,16 @@ function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
     remito_finalizado: fetchRemitos,
   });
 
-  // Se ejecuta recién cuando el usuario clickea "Ver detalle" de un remito
-  async function verDetalleRemito(remito: any) {
+  // Abre el detalle de un remito (líneas + resultados) — lo usan tanto "Ver
+  // detalle" como la búsqueda por código de muestra. lineaAResaltar marca
+  // la fila que hay que destacar en la tabla de líneas (null si se entró
+  // por el botón normal, sin ninguna línea puntual en mente).
+  async function abrirDetalleRemito(
+    remito: any,
+    lineaAResaltar: string | null = null,
+  ) {
     setRemitoSeleccionado(remito);
+    setLineaResaltadaId(lineaAResaltar);
     setCargandoDetalle(true);
 
     try {
@@ -92,10 +110,71 @@ function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
     }
   }
 
+  // Se ejecuta cuando el usuario clickea "Ver detalle" de un remito
+  function verDetalleRemito(remito: any) {
+    abrirDetalleRemito(remito);
+  }
+
   function volverALista() {
     setRemitoSeleccionado(null);
     setLineasDelRemito([]);
     setResultados([]);
+    setLineaResaltadaId(null);
+  }
+
+  // Busca la línea por código de muestra, resuelve su remito y abre el
+  // detalle con esa línea resaltada. Se dispara con Enter (el lector de
+  // barcode USB "tipea" el código y manda un Enter automático) y siempre
+  // devuelve el foco al input al terminar, para poder escanear de corrido.
+  async function buscarPorCodigo() {
+    if (!codigoBusqueda.trim()) return;
+
+    setBuscandoCodigo(true);
+    setErrorBusqueda("");
+
+    try {
+      const responseLinea = await fetchConToken(
+        `${API_URL}/api/v1/lineaRecoleccion/codigo?codigo=${codigoBusqueda}`,
+      );
+
+      if (!responseLinea.ok) {
+        const data = await responseLinea.json();
+        setErrorBusqueda(
+          data.error || "No se encontró ninguna línea con ese código",
+        );
+        return;
+      }
+
+      const linea = await responseLinea.json();
+
+      const responseRemito = await fetchConToken(
+        `${API_URL}/api/v1/remito/${linea.remito_id}`,
+      );
+
+      if (!responseRemito.ok) {
+        const data = await responseRemito.json();
+        setErrorBusqueda(
+          data.error || "No se pudo abrir el remito de esa línea",
+        );
+        return;
+      }
+
+      const remito = await responseRemito.json();
+      await abrirDetalleRemito(remito, linea.id);
+    } catch (error) {
+      setErrorBusqueda("Error al conectar con el servidor");
+    } finally {
+      setBuscandoCodigo(false);
+      setCodigoBusqueda("");
+      inputBusquedaRef.current?.focus();
+    }
+  }
+
+  // Se dispara con cada tecla — nos interesa detectar específicamente "Enter"
+  function manejarTeclaBusqueda(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      buscarPorCodigo();
+    }
   }
 
   function resultadoDeLinea(lineaId: string) {
@@ -193,6 +272,55 @@ function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
               </tbody>
             </table>
           )}
+
+          {/* Búsqueda por código de muestra — solo en la vista global, no
+              cuando Remito.tsx está acotado a un camionero puntual, porque
+              un código escaneado puede pertenecer a cualquier camionero. */}
+          {!camioneroId && (
+            <div
+              className="card shadow-sm"
+              style={{
+                position: "fixed",
+                bottom: "1rem",
+                right: "1rem",
+                width: "280px",
+                zIndex: 1030,
+              }}
+            >
+              <div className="card-body p-2">
+                <label className="form-label text-muted small mb-1">
+                  Buscar por código de muestra
+                </label>
+                <div className="input-group input-group-sm">
+                  <input
+                    ref={inputBusquedaRef}
+                    type="text"
+                    placeholder="Escaneá o escribí el código..."
+                    value={codigoBusqueda}
+                    onChange={(e) => setCodigoBusqueda(e.target.value)}
+                    onKeyDown={manejarTeclaBusqueda}
+                    className="form-control"
+                    autoFocus
+                  />
+                  <button
+                    className="btn btn-outline-primary"
+                    onClick={buscarPorCodigo}
+                    disabled={buscandoCodigo}
+                  >
+                    🔍
+                  </button>
+                </div>
+                {buscandoCodigo && (
+                  <small className="text-muted">Buscando...</small>
+                )}
+                {errorBusqueda && (
+                  <small className="text-danger d-block mt-1">
+                    {errorBusqueda}
+                  </small>
+                )}
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -224,7 +352,12 @@ function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
               </thead>
               <tbody>
                 {lineasDelRemito.map((linea: any) => (
-                  <tr key={linea.id}>
+                  <tr
+                    key={linea.id}
+                    className={
+                      linea.id === lineaResaltadaId ? "table-warning" : undefined
+                    }
+                  >
                     <td>{nombreTambo(linea.tambo_id)}</td>
                     <td>{linea.litros_recibidos}</td>
                     <td>{linea.temperatura_celcius}°C</td>

@@ -12,6 +12,10 @@ type CrearUsuarioRequest struct {
 	Rol        string `json:"rol"`
 }
 
+// ActualizarUsuarioRequest no incluye Rol a propósito: cambiar el rol de un
+// usuario existente dejaría datos incoherentes (un ex-camionero con registro
+// de Camionero huérfano y remitos históricos a su nombre). El rol se define
+// una sola vez, al crear el usuario.
 type ActualizarUsuarioRequest struct {
 	Nombre     string `json:"nombre,omitempty"`
 	Apellido   string `json:"apellido,omitempty"`
@@ -19,7 +23,6 @@ type ActualizarUsuarioRequest struct {
 	Telefono   string `json:"telefono,omitempty"`
 	Email      string `json:"email,omitempty"`
 	Contrasena string `json:"contrasena,omitempty"`
-	Rol        string `json:"rol,omitempty"`
 }
 
 type UsuarioResponse struct {

@@ -89,3 +89,13 @@ func (r TamberoRepositoryImpl) DesactivarTambero(cfg config.Config, id primitive
 	)
 	return err
 }
+
+func (r TamberoRepositoryImpl) ActivarTambero(cfg config.Config, id primitive.ObjectID) error {
+	collection := db.DB.Database(cfg.MongoDB).Collection("tamberos")
+	_, err := collection.UpdateOne(
+		context.TODO(),
+		bson.M{"_id": id},
+		bson.M{"$set": bson.M{"activo": true}},
+	)
+	return err
+}

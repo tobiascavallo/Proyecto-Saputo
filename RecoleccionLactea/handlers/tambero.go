@@ -16,6 +16,7 @@ type TamberoService interface {
 	ObtenerTamberoPorCuit(cuit string) (*models.Tambero, error)
 	ActualizarTambero(id primitive.ObjectID, model models.Tambero) error
 	DesactivarTambero(id primitive.ObjectID) error
+	ActivarTambero(id primitive.ObjectID) error
 }
 
 type TamberoHandler struct {
@@ -175,4 +176,19 @@ func (h TamberoHandler) DesactivarTambero(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"mensaje": "tambero desactivado correctamente"})
+}
+
+func (h TamberoHandler) ActivarTambero(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	if err := h.service.ActivarTambero(id); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"mensaje": "tambero activado correctamente"})
 }

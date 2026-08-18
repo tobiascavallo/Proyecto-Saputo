@@ -133,7 +133,36 @@ function AltaEmpresaTransportista() {
         return;
       }
 
-      fetchEmpresas();
+      setEmpresas((actuales) =>
+        actuales.map((e) =>
+          e.id === empresa.id ? { ...e, activo: false } : e,
+        ),
+      );
+    } catch (error) {
+      setErrorListado("Error al conectar con el servidor");
+    }
+  }
+
+  async function handleActivar(empresa: any) {
+    if (!window.confirm(`¿Reactivar la empresa "${empresa.nombre}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetchConToken(
+        `${API_URL}/api/v1/empresaTransportista/${empresa.id}/activar`,
+        { method: "PATCH" },
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        setErrorListado(data.error || "Error al reactivar la empresa");
+        return;
+      }
+
+      setEmpresas((actuales) =>
+        actuales.map((e) => (e.id === empresa.id ? { ...e, activo: true } : e)),
+      );
     } catch (error) {
       setErrorListado("Error al conectar con el servidor");
     }
@@ -230,12 +259,19 @@ function AltaEmpresaTransportista() {
                         >
                           Editar
                         </button>
-                        {empresa.activo && (
+                        {empresa.activo ? (
                           <button
                             className="btn btn-sm btn-outline-danger"
                             onClick={() => handleDesactivar(empresa)}
                           >
                             Desactivar
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => handleActivar(empresa)}
+                          >
+                            Reactivar
                           </button>
                         )}
                       </div>

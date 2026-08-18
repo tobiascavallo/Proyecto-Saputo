@@ -61,6 +61,16 @@ func (r AcopladoRepositoryImpl) DesactivarAcoplado(cfg config.Config, id primiti
 	return err
 }
 
+func (r AcopladoRepositoryImpl) ActivarAcoplado(cfg config.Config, id primitive.ObjectID) error {
+	collection := db.DB.Database(cfg.MongoDB).Collection("acoplados")
+	_, err := collection.UpdateOne(
+		context.TODO(),
+		bson.M{"_id": id},
+		bson.M{"$set": bson.M{"activo": true}},
+	)
+	return err
+}
+
 func (r AcopladoRepositoryImpl) ObtenerAcopladosPorEmpresa(cfg config.Config, empresaID primitive.ObjectID) ([]models.Acoplado, error) {
 	collection := db.DB.Database(cfg.MongoDB).Collection("acoplados")
 	cursor, err := collection.Find(context.TODO(), bson.M{"empresa_transportista_id": empresaID, "activo": true})

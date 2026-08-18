@@ -139,7 +139,36 @@ function AltaVehiculo() {
         return;
       }
 
-      fetchVehiculos();
+      setVehiculos((actuales) =>
+        actuales.map((v) =>
+          v.id === vehiculo.id ? { ...v, activo: false } : v,
+        ),
+      );
+    } catch (error) {
+      setErrorListado("Error al conectar con el servidor");
+    }
+  }
+
+  async function handleActivar(vehiculo: any) {
+    if (!window.confirm(`¿Reactivar el vehículo ${vehiculo.patente}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetchConToken(
+        `${API_URL}/api/v1/vehiculo/${vehiculo.id}/activar`,
+        { method: "PATCH" },
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        setErrorListado(data.error || "Error al reactivar el vehículo");
+        return;
+      }
+
+      setVehiculos((actuales) =>
+        actuales.map((v) => (v.id === vehiculo.id ? { ...v, activo: true } : v)),
+      );
     } catch (error) {
       setErrorListado("Error al conectar con el servidor");
     }
@@ -246,12 +275,19 @@ function AltaVehiculo() {
                         >
                           Editar
                         </button>
-                        {vehiculo.activo && (
+                        {vehiculo.activo ? (
                           <button
                             className="btn btn-sm btn-outline-danger"
                             onClick={() => handleDesactivar(vehiculo)}
                           >
                             Desactivar
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => handleActivar(vehiculo)}
+                          >
+                            Reactivar
                           </button>
                         )}
                       </div>

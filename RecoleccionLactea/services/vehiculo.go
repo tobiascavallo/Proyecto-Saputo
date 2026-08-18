@@ -15,6 +15,7 @@ type VehiculoRepository interface {
 	ObtenerVehiculosPorID(cfg config.Config, ID primitive.ObjectID) (*models.Vehiculo, error)
 	ActualizarVehiculo(cfg config.Config, id primitive.ObjectID, model models.Vehiculo) error
 	DesactivarVehiculo(cfg config.Config, id primitive.ObjectID) error
+	ActivarVehiculo(cfg config.Config, id primitive.ObjectID) error
 	ObtenerVehiculosPorEmpresa(cfg config.Config, empresaID primitive.ObjectID) ([]models.Vehiculo, error)
 	ObtenerVehiculoPorPatente(cfg config.Config, patente string) (*models.Vehiculo, error)
 }
@@ -137,6 +138,20 @@ func (s VehiculoService) DesactivarVehiculo(id primitive.ObjectID) error {
 		return errors.New("vehículo no encontrado")
 	}
 	return s.repo.DesactivarVehiculo(s.cfg, id)
+}
+
+// ActivarVehiculo revierte una baja lógica. La patente sigue siendo única
+// globalmente (ver validarPatente/ObtenerVehiculoPorPatente, que no filtran
+// por activo), así que no hay riesgo de colisión al reactivar.
+func (s VehiculoService) ActivarVehiculo(id primitive.ObjectID) error {
+	if id.IsZero() {
+		return errors.New("ID inválido")
+	}
+	_, err := s.repo.ObtenerVehiculosPorID(s.cfg, id)
+	if err != nil {
+		return errors.New("vehículo no encontrado")
+	}
+	return s.repo.ActivarVehiculo(s.cfg, id)
 }
 
 // ObtenerVehiculosPorEmpresa lista todos los vehículos de una empresa transportista.

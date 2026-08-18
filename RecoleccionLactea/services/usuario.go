@@ -19,6 +19,7 @@ type UsuarioRepository interface {
 	ObtenerUsuarioPorDNI(cfg config.Config, dni string) (*models.Usuario, error)
 	ActualizarUsuario(cfg config.Config, id primitive.ObjectID, model models.Usuario) error
 	DesactivarUsuario(cfg config.Config, id primitive.ObjectID) error
+	ActivarUsuario(cfg config.Config, id primitive.ObjectID) error
 	ContarEncargadosActivos(cfg config.Config) (int64, error)
 }
 
@@ -97,31 +98,17 @@ func (s UsuarioService) ObtenerUsuarioPorID(id primitive.ObjectID) (*models.Usua
 	return s.repo.ObtenerUsuarioPorID(s.cfg, id)
 }
 
-// ActualizarUsuario modifica los datos de un usuario. Protege al último encargado del sistema.
+// ActualizarUsuario modifica los datos de un usuario. El rol no se puede
+// cambiar acá — ver dto.ActualizarUsuarioRequest.
 func (s UsuarioService) ActualizarUsuario(id primitive.ObjectID, model models.Usuario) error {
 	if id.IsZero() {
 		return errors.New("ID inválido")
-	}
-
-	if model.Rol != "" && model.Rol != models.RolCamionero && model.Rol != models.RolEmpleado && model.Rol != models.RolEncargado {
-		return errors.New("rol inválido")
 	}
 
 	// Verificar que el usuario exista
 	usuarioExistente, err := s.repo.ObtenerUsuarioPorID(s.cfg, id)
 	if err != nil {
 		return errors.New("usuario no encontrado")
-	}
-
-	// Verificar que no sea el último encargado si se cambia el rol
-	if model.Rol != "" && model.Rol != usuarioExistente.Rol && usuarioExistente.Rol == models.RolEncargado {
-		count, err := s.repo.ContarEncargadosActivos(s.cfg)
-		if err != nil {
-			return err
-		}
-		if count <= 1 {
-			return errors.New("no se puede cambiar el rol del último encargado del sistema")
-		}
 	}
 
 	// DNI y teléfono son opcionales en una edición — si vienen, se validan
@@ -159,9 +146,6 @@ func (s UsuarioService) ActualizarUsuario(id primitive.ObjectID, model models.Us
 	}
 	if model.Telefono != "" {
 		usuarioExistente.Telefono = model.Telefono
-	}
-	if model.Rol != "" {
-		usuarioExistente.Rol = model.Rol
 	}
 	if model.Contraseña != "" {
 		if err := validarContraseña(model.Contraseña); err != nil {
@@ -206,6 +190,20 @@ func (s UsuarioService) DesactivarUsuario(id primitive.ObjectID) error {
 	}
 
 	return s.repo.DesactivarUsuario(s.cfg, id)
+}
+
+// ActivarUsuario revierte una baja lógica. No hay invariantes que proteger acá
+// (a diferencia de Desactivar, que no puede dejar el sistema sin encargados) —
+// el DNI y el email de un usuario dado de baja siguen reservados aunque esté
+// inactivo, así que no hay riesgo de colisión al reactivarlo.
+func (s UsuarioService) ActivarUsuario(id primitive.ObjectID) error {
+	if id.IsZero() {
+		return errors.New("ID inválido")
+	}
+	if _, err := s.repo.ObtenerUsuarioPorID(s.cfg, id); err != nil {
+		return errors.New("usuario no encontrado")
+	}
+	return s.repo.ActivarUsuario(s.cfg, id)
 }
 
 // validarDNI verifica que el DNI tenga 7 u 8 dígitos numéricos (formato argentino).

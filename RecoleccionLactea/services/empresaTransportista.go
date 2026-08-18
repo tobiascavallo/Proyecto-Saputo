@@ -16,6 +16,7 @@ type EmpresaTransportistaRepository interface {
 	ObtenerEmpresaTransportistaPorId(cfg config.Config, id primitive.ObjectID) (models.EmpresaTransportista, error)
 	ActualizarEmpresaTransportista(cfg config.Config, id primitive.ObjectID, model models.EmpresaTransportista) error
 	DesactivarEmpresaTransportista(cfg config.Config, id primitive.ObjectID) error
+	ActivarEmpresaTransportista(cfg config.Config, id primitive.ObjectID) error
 }
 
 type EmpresaTransportistaService struct {
@@ -123,6 +124,19 @@ func (s EmpresaTransportistaService) DesactivarEmpresaTransportista(id primitive
 	}
 
 	return s.repo.DesactivarEmpresaTransportista(s.cfg, id)
+}
+
+func (s EmpresaTransportistaService) ActivarEmpresaTransportista(id primitive.ObjectID) error {
+	if id.IsZero() {
+		return fmt.Errorf("ID inválido")
+	}
+
+	_, err := s.repo.ObtenerEmpresaTransportistaPorId(s.cfg, id)
+	if err != nil {
+		return fmt.Errorf("empresa transportista no encontrada")
+	}
+
+	return s.repo.ActivarEmpresaTransportista(s.cfg, id)
 }
 
 // ValidarCuitEmpresa realiza la validación completa de un CUIT de persona jurídica (empresa)

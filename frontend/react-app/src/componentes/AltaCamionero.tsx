@@ -185,7 +185,43 @@ function AltaCamionero() {
       }
 
       invalidarCamionero(camionero.usuario_id);
-      fetchCamioneros();
+      setCamioneros((actuales) =>
+        actuales.map((c) =>
+          c.id === camionero.id ? { ...c, activo: false } : c,
+        ),
+      );
+    } catch (error) {
+      setErrorListado("Error al conectar con el servidor");
+    }
+  }
+
+  async function handleActivar(camionero: any) {
+    if (
+      !window.confirm(
+        `¿Reactivar los datos de camionero de ${camionero.usuario_nombre}?`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetchConToken(
+        `${API_URL}/api/v1/camionero/${camionero.id}/activar`,
+        { method: "PATCH" },
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        setErrorListado(data.error || "Error al reactivar el camionero");
+        return;
+      }
+
+      invalidarCamionero(camionero.usuario_id);
+      setCamioneros((actuales) =>
+        actuales.map((c) =>
+          c.id === camionero.id ? { ...c, activo: true } : c,
+        ),
+      );
     } catch (error) {
       setErrorListado("Error al conectar con el servidor");
     }
@@ -307,12 +343,19 @@ function AltaCamionero() {
                         >
                           Ver remitos
                         </button>
-                        {camionero.activo && (
+                        {camionero.activo ? (
                           <button
                             className="btn btn-sm btn-outline-danger"
                             onClick={() => handleDesactivar(camionero)}
                           >
                             Desactivar
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => handleActivar(camionero)}
+                          >
+                            Reactivar
                           </button>
                         )}
                       </div>

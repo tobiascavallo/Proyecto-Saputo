@@ -192,7 +192,38 @@ function AltaUsuario() {
         return;
       }
 
-      fetchUsuarios();
+      setUsuarios((actuales) =>
+        actuales.map((u) =>
+          u.id === usuario.id ? { ...u, activo: false } : u,
+        ),
+      );
+    } catch (error) {
+      setErrorListado("Error al conectar con el servidor");
+    }
+  }
+
+  async function handleActivar(usuario: any) {
+    if (
+      !window.confirm(`¿Reactivar a ${usuario.nombre} ${usuario.apellido}?`)
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetchConToken(
+        `${API_URL}/api/v1/usuario/${usuario.id}/activar`,
+        { method: "PATCH" },
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        setErrorListado(data.error || "Error al reactivar el usuario");
+        return;
+      }
+
+      setUsuarios((actuales) =>
+        actuales.map((u) => (u.id === usuario.id ? { ...u, activo: true } : u)),
+      );
     } catch (error) {
       setErrorListado("Error al conectar con el servidor");
     }
@@ -311,12 +342,19 @@ function AltaUsuario() {
                         >
                           Editar
                         </button>
-                        {usuario.activo && (
+                        {usuario.activo ? (
                           <button
                             className="btn btn-sm btn-outline-danger"
                             onClick={() => handleDesactivar(usuario)}
                           >
                             Desactivar
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => handleActivar(usuario)}
+                          >
+                            Reactivar
                           </button>
                         )}
                       </div>
@@ -380,16 +418,27 @@ function AltaUsuario() {
               }
               className="form-control mb-3"
             />
-            <select
-              value={form.rol}
-              onChange={(e) => setForm({ ...form, rol: e.target.value })}
-              className="form-select mb-3"
-            >
-              <option value="">Seleccionar rol</option>
-              <option value="camionero">Camionero</option>
-              <option value="empleado">Empleado</option>
-              <option value="encargado">Encargado</option>
-            </select>
+            {editandoId ? (
+              // El rol no se puede cambiar en una edición — se muestra
+              // informativo, no como select (ver dto.ActualizarUsuarioRequest).
+              <div className="mb-3">
+                <label className="form-label text-muted">Rol</label>
+                <p className="form-control-plaintext">
+                  {nombreRol(form.rol)}
+                </p>
+              </div>
+            ) : (
+              <select
+                value={form.rol}
+                onChange={(e) => setForm({ ...form, rol: e.target.value })}
+                className="form-select mb-3"
+              >
+                <option value="">Seleccionar rol</option>
+                <option value="camionero">Camionero</option>
+                <option value="empleado">Empleado</option>
+                <option value="encargado">Encargado</option>
+              </select>
+            )}
 
             <div className="d-flex gap-2">
               <button

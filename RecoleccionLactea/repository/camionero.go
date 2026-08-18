@@ -72,3 +72,13 @@ func (r CamioneroRepositoryImpl) DesactivarCamionero(cfg config.Config, id primi
 	)
 	return err
 }
+
+func (r CamioneroRepositoryImpl) ActivarCamionero(cfg config.Config, id primitive.ObjectID) error {
+	collection := db.DB.Database(cfg.MongoDB).Collection("camioneros")
+	_, err := collection.UpdateOne(
+		context.TODO(),
+		bson.M{"_id": id},
+		bson.M{"$set": bson.M{"activo": true}},
+	)
+	return err
+}

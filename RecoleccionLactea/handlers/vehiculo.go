@@ -13,6 +13,7 @@ type VehiculoService interface {
 	ObtenerVehiculoPorID(id primitive.ObjectID) (*models.Vehiculo, error)
 	ActualizarVehiculo(id primitive.ObjectID, model models.Vehiculo) error
 	DesactivarVehiculo(id primitive.ObjectID) error
+	ActivarVehiculo(id primitive.ObjectID) error
 	ObtenerVehiculosPorEmpresa(empresaID primitive.ObjectID) ([]models.Vehiculo, error)
 }
 
@@ -116,6 +117,21 @@ func (h VehiculoHandler) DesactivarVehiculo(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"mensaje": "vehículo desactivado correctamente"})
+}
+
+func (h VehiculoHandler) ActivarVehiculo(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	if err := h.service.ActivarVehiculo(id); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"mensaje": "vehículo activado correctamente"})
 }
 
 func (h VehiculoHandler) ObtenerVehiculosPorEmpresa(c *gin.Context) {

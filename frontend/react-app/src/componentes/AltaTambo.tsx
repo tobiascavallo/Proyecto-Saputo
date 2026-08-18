@@ -132,7 +132,34 @@ function AltaTambo() {
         return;
       }
 
-      fetchTambos();
+      setTambos((actuales) =>
+        actuales.map((t) => (t.id === tambo.id ? { ...t, activo: false } : t)),
+      );
+    } catch (error) {
+      setErrorListado("Error al conectar con el servidor");
+    }
+  }
+
+  async function handleActivar(tambo: any) {
+    if (!window.confirm(`¿Reactivar el tambo N° ${tambo.numero_tambo}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetchConToken(
+        `${API_URL}/api/v1/tambo/${tambo.id}/activar`,
+        { method: "PATCH" },
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        setErrorListado(data.error || "Error al reactivar el tambo");
+        return;
+      }
+
+      setTambos((actuales) =>
+        actuales.map((t) => (t.id === tambo.id ? { ...t, activo: true } : t)),
+      );
     } catch (error) {
       setErrorListado("Error al conectar con el servidor");
     }
@@ -227,12 +254,19 @@ function AltaTambo() {
                         >
                           Editar
                         </button>
-                        {tambo.activo && (
+                        {tambo.activo ? (
                           <button
                             className="btn btn-sm btn-outline-danger"
                             onClick={() => handleDesactivar(tambo)}
                           >
                             Desactivar
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => handleActivar(tambo)}
+                          >
+                            Reactivar
                           </button>
                         )}
                       </div>

@@ -14,6 +14,7 @@ type AcopladoRepository interface {
 	ObtenerAcopladoPorID(cfg config.Config, ID primitive.ObjectID) (*models.Acoplado, error)
 	ActualizarAcoplado(cfg config.Config, id primitive.ObjectID, model models.Acoplado) error
 	DesactivarAcoplado(cfg config.Config, id primitive.ObjectID) error
+	ActivarAcoplado(cfg config.Config, id primitive.ObjectID) error
 	ObtenerAcopladosPorEmpresa(cfg config.Config, empresaID primitive.ObjectID) ([]models.Acoplado, error)
 	ObtenerAcopladoPorPatente(cfg config.Config, patente string) (*models.Acoplado, error)
 }
@@ -118,6 +119,19 @@ func (s AcopladoService) DesactivarAcoplado(id primitive.ObjectID) error {
 		return errors.New("acoplado no encontrado")
 	}
 	return s.repo.DesactivarAcoplado(s.cfg, id)
+}
+
+// ActivarAcoplado revierte una baja lógica. La patente sigue siendo única
+// globalmente (no filtra por activo), así que no hay riesgo de colisión.
+func (s AcopladoService) ActivarAcoplado(id primitive.ObjectID) error {
+	if id.IsZero() {
+		return errors.New("ID inválido")
+	}
+	_, err := s.repo.ObtenerAcopladoPorID(s.cfg, id)
+	if err != nil {
+		return errors.New("acoplado no encontrado")
+	}
+	return s.repo.ActivarAcoplado(s.cfg, id)
 }
 
 func (s AcopladoService) ObtenerAcopladosPorEmpresa(empresaID primitive.ObjectID) ([]models.Acoplado, error) {

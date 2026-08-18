@@ -13,6 +13,7 @@ type EmpresaTransportistaService interface {
 	ObtenerEmpresaTransportistaPorId(id primitive.ObjectID) (*models.EmpresaTransportista, error)
 	ActualizarEmpresaTransportista(id primitive.ObjectID, model models.EmpresaTransportista) error
 	DesactivarEmpresaTransportista(id primitive.ObjectID) error
+	ActivarEmpresaTransportista(id primitive.ObjectID) error
 }
 
 type EmpresaTransportistaHandler struct {
@@ -114,4 +115,19 @@ func (h EmpresaTransportistaHandler) DesactivarEmpresaTransportista(c *gin.Conte
 	}
 
 	c.JSON(200, gin.H{"mensaje": "empresa transportista desactivada correctamente"})
+}
+
+func (h EmpresaTransportistaHandler) ActivarEmpresaTransportista(c *gin.Context) {
+	id, err := primitive.ObjectIDFromHex(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "ID inválido"})
+		return
+	}
+
+	if err := h.service.ActivarEmpresaTransportista(id); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"mensaje": "empresa transportista activada correctamente"})
 }

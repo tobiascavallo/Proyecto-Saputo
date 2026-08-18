@@ -15,6 +15,7 @@ type CamioneroRepository interface {
 	ObtenerCamioneroPorUsuarioID(cfg config.Config, usuarioID primitive.ObjectID) (*models.Camionero, error)
 	ActualizarCamionero(cfg config.Config, id primitive.ObjectID, model models.Camionero) error
 	DesactivarCamionero(cfg config.Config, id primitive.ObjectID) error
+	ActivarCamionero(cfg config.Config, id primitive.ObjectID) error
 }
 
 // UsuarioRepositoryPorCamionero es el subconjunto de UsuarioRepository que
@@ -134,6 +135,26 @@ func (s CamioneroService) DesactivarCamionero(id primitive.ObjectID) error {
 		return errors.New("camionero no encontrado")
 	}
 	return s.repo.DesactivarCamionero(s.cfg, id)
+}
+
+// ActivarCamionero revierte una baja lógica. ObtenerCamioneroPorUsuarioID
+// solo mira registros activos (mismo criterio que CrearCamionero usa para
+// la unicidad 1 a 1 con el usuario) — si mientras este camionero estaba
+// desactivado se completaron datos nuevos para el mismo usuario, reactivar
+// dejaría dos registros activos para el mismo usuario_id. Se rechaza en ese caso.
+func (s CamioneroService) ActivarCamionero(id primitive.ObjectID) error {
+	if id.IsZero() {
+		return errors.New("ID inválido")
+	}
+	camionero, err := s.repo.ObtenerCamioneroPorID(s.cfg, id)
+	if err != nil {
+		return errors.New("camionero no encontrado")
+	}
+	existente, _ := s.repo.ObtenerCamioneroPorUsuarioID(s.cfg, camionero.UsuarioID)
+	if existente != nil && existente.ID != id {
+		return errors.New("este usuario ya tiene otro registro de camionero activo")
+	}
+	return s.repo.ActivarCamionero(s.cfg, id)
 }
 
 // ObtenerDatosUsuario resuelve nombre completo, DNI y teléfono de un usuario

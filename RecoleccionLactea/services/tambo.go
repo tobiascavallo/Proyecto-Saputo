@@ -16,6 +16,7 @@ type TamboRepository interface {
 	ObtenerTamboPorNumeroTambo(cfg config.Config, numero int) (*models.Tambo, error)
 	ActualizarTambo(cfg config.Config, id primitive.ObjectID, model models.Tambo) error
 	DesactivarTambo(cfg config.Config, id primitive.ObjectID) error
+	ActivarTambo(cfg config.Config, id primitive.ObjectID) error
 }
 
 type TamboService struct {
@@ -122,4 +123,27 @@ func (s TamboService) DesactivarTambo(id primitive.ObjectID) error {
 		return errors.New("el tambo no existe")
 	}
 	return s.repo.DesactivarTambo(s.cfg, id)
+}
+
+// ActivarTambo revierte una baja lógica. ObtenerTamboPorNumeroTambo solo
+// mira tambos activos (mismo criterio que CrearTambo/ActualizarTambo usan
+// para la unicidad de número) — si mientras este tambo estaba desactivado
+// se dio de alta otro con el mismo número, reactivar dejaría dos tambos
+// activos con el mismo numero_tambo. Se rechaza en ese caso.
+func (s TamboService) ActivarTambo(id primitive.ObjectID) error {
+	if id.IsZero() {
+		return errors.New("ID inválido")
+	}
+	tambo, err := s.repo.ObtenerTamboPorID(s.cfg, id)
+	if err != nil {
+		return err
+	}
+	if tambo == nil {
+		return errors.New("el tambo no existe")
+	}
+	tamboConMismoNumero, err := s.repo.ObtenerTamboPorNumeroTambo(s.cfg, tambo.NumeroTambo)
+	if err == nil && tamboConMismoNumero != nil && tamboConMismoNumero.ID != id {
+		return errors.New("ya existe otro tambo activo con ese número")
+	}
+	return s.repo.ActivarTambo(s.cfg, id)
 }

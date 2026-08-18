@@ -80,6 +80,16 @@ func (r UsuarioRepositoryImpl) DesactivarUsuario(cfg config.Config, id primitive
 	return err
 }
 
+func (r UsuarioRepositoryImpl) ActivarUsuario(cfg config.Config, id primitive.ObjectID) error {
+	collection := db.DB.Database(cfg.MongoDB).Collection("usuarios")
+	_, err := collection.UpdateOne(
+		context.TODO(),
+		bson.M{"_id": id},
+		bson.M{"$set": bson.M{"activo": true}},
+	)
+	return err
+}
+
 // metodo para verificar que el sistema no quede sin encargados activos("eliminados") porque sino nadie podria administrar el mismo.
 func (r UsuarioRepositoryImpl) ContarEncargadosActivos(cfg config.Config) (int64, error) {
 	collection := db.DB.Database(cfg.MongoDB).Collection("usuarios")

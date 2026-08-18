@@ -137,7 +137,36 @@ function AltaAcoplado() {
         return;
       }
 
-      fetchAcoplados();
+      setAcoplados((actuales) =>
+        actuales.map((a) =>
+          a.id === acoplado.id ? { ...a, activo: false } : a,
+        ),
+      );
+    } catch (error) {
+      setErrorListado("Error al conectar con el servidor");
+    }
+  }
+
+  async function handleActivar(acoplado: any) {
+    if (!window.confirm(`¿Reactivar el acoplado ${acoplado.patente}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetchConToken(
+        `${API_URL}/api/v1/acoplado/${acoplado.id}/activar`,
+        { method: "PATCH" },
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        setErrorListado(data.error || "Error al reactivar el acoplado");
+        return;
+      }
+
+      setAcoplados((actuales) =>
+        actuales.map((a) => (a.id === acoplado.id ? { ...a, activo: true } : a)),
+      );
     } catch (error) {
       setErrorListado("Error al conectar con el servidor");
     }
@@ -236,12 +265,19 @@ function AltaAcoplado() {
                         >
                           Editar
                         </button>
-                        {acoplado.activo && (
+                        {acoplado.activo ? (
                           <button
                             className="btn btn-sm btn-outline-danger"
                             onClick={() => handleDesactivar(acoplado)}
                           >
                             Desactivar
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => handleActivar(acoplado)}
+                          >
+                            Reactivar
                           </button>
                         )}
                       </div>
