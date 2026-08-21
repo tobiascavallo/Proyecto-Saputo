@@ -175,12 +175,12 @@ func (s CamioneroService) ActivarCamionero(id primitive.ObjectID) error {
 // exponer el usuario_id crudo. Si no se pudo resolver (usuario borrado, ID
 // inválido, etc.) devuelve cadenas vacías en vez de fallar todo el listado
 // por un dato de referencia faltante.
-func (s CamioneroService) ObtenerDatosUsuario(usuarioID primitive.ObjectID) (nombre string, dni string, telefono string) {
+func (s CamioneroService) ObtenerDatosUsuario(usuarioID primitive.ObjectID) (nombre string, dni string, telefono string, email string) {
 	usuario, err := s.usuarioRepo.ObtenerUsuarioPorID(s.cfg, usuarioID)
 	if err != nil {
-		return "", "", ""
+		return "", "", "", ""
 	}
-	return usuario.Nombre + " " + usuario.Apellido, usuario.DNI, usuario.Telefono
+	return usuario.Nombre + " " + usuario.Apellido, usuario.DNI, usuario.Telefono, usuario.Email
 }
 
 // ObtenerNombreEmpresa resuelve el nombre de una empresa transportista para

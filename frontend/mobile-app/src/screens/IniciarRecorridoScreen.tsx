@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { fechaDeHoy } from '../utils/fecha';
@@ -16,6 +16,7 @@ const ACOPLADO_COMPATIBLE: Record<string, string> = {
 
 export const IniciarRecorridoScreen = ({ navigation }: any) => {
   const { usuarioId } = useAuth();
+  const queryClient = useQueryClient();
   const [vehiculoId, setVehiculoId] = useState('');
   const [acopladoId, setAcopladoId] = useState('');
   const [numeroRecorrido, setNumeroRecorrido] = useState('');
@@ -76,10 +77,13 @@ export const IniciarRecorridoScreen = ({ navigation }: any) => {
       const res = await api.post('/remito', payload);
       return res.data;
     },
-    onSuccess: () => {
-      // POST /remito no devuelve el ID del remito creado — Cargando vuelve
-      // a resolver "mi remito en curso" y ahora va a encontrar este mismo.
-      navigation.replace('Cargando');
+    onSuccess: (data) => {
+      // El backend devuelve el remito recién creado — sembramos el caché
+      // compartido de useRemitoActivo con ese dato y vamos directo a
+      // RemitoActivo, sin pasar por Cargando (que tendría que volver a
+      // pedirlo por HTTP para enterarse de algo que ya tenemos en mano).
+      queryClient.setQueryData(['remitoActivo'], data.remito);
+      navigation.replace('RemitoActivo');
     },
     onError: (err: any) => {
       Alert.alert('Error', err.response?.data?.error || 'No se pudo iniciar el recorrido');

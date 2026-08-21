@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useRemitoActivo } from '../hooks/useRemitoActivo';
 
 export const RemitoActivoScreen = ({ navigation }: any) => {
+  const queryClient = useQueryClient();
   const { data: remito, isLoading: loadingRemito } = useRemitoActivo();
 
   // Se necesita el vehículo del remito para saber si tiene cisterna propia
@@ -46,8 +47,11 @@ export const RemitoActivoScreen = ({ navigation }: any) => {
       return res.data;
     },
     onSuccess: () => {
+      // Ya sabemos que no hay remito en curso — no hace falta que Cargando
+      // vuelva a preguntarle al backend, mismo criterio que al crear uno.
+      queryClient.setQueryData(['remitoActivo'], null);
       Alert.alert('Éxito', 'Remito finalizado correctamente');
-      navigation.replace('Cargando');
+      navigation.replace('IniciarRecorrido');
     },
     onError: (err: any) => {
       Alert.alert('Error', err.response?.data?.error || 'No se pudo finalizar el remito');

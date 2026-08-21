@@ -15,7 +15,7 @@ type CamioneroService interface {
 	ActualizarCamionero(id primitive.ObjectID, model models.Camionero) error
 	DesactivarCamionero(id primitive.ObjectID) error
 	ActivarCamionero(id primitive.ObjectID) error
-	ObtenerDatosUsuario(usuarioID primitive.ObjectID) (nombre string, dni string, telefono string)
+	ObtenerDatosUsuario(usuarioID primitive.ObjectID) (nombre string, dni string, telefono string, email string)
 	ObtenerNombreEmpresa(empresaID primitive.ObjectID) string
 }
 
@@ -31,9 +31,9 @@ func NewCamioneroHandler(service CamioneroService) CamioneroHandler {
 // teléfono del usuario y el nombre de la empresa transportista, en vez de
 // devolver los IDs crudos.
 func (h CamioneroHandler) enriquecer(c models.Camionero) dto.CamioneroResponse {
-	nombre, dni, telefono := h.service.ObtenerDatosUsuario(c.UsuarioID)
+	nombre, dni, telefono, email := h.service.ObtenerDatosUsuario(c.UsuarioID)
 	nombreEmpresa := h.service.ObtenerNombreEmpresa(c.EmpresaTransportistaID)
-	return dto.CamioneroToResponse(c, nombre, dni, telefono, nombreEmpresa)
+	return dto.CamioneroToResponse(c, nombre, dni, telefono, email, nombreEmpresa)
 }
 
 func (h CamioneroHandler) CrearCamionero(c *gin.Context) {

@@ -69,27 +69,31 @@ func NewRemitoService(
 	}
 }
 
-func (s RemitoService) CrearRemito(model models.Remito) error {
+// CrearRemito devuelve el remito ya creado (con ID y numero_remito
+// asignados) — el frontend móvil lo necesita enseguida para navegar directo
+// al remito recién creado sin un pedido de más, mismo criterio que ya usamos
+// en UsuarioService.CrearUsuario para el flujo de alta de camionero.
+func (s RemitoService) CrearRemito(model models.Remito) (models.Remito, error) {
 	if model.CamioneroID.IsZero() {
-		return errors.New("camionero requerido")
+		return models.Remito{}, errors.New("camionero requerido")
 	}
 	vehiculo, _ := s.vehiculoRepo.ObtenerVehiculosPorID(s.cfg, model.VehiculoID)
 	if vehiculo == nil {
-		return errors.New("vehiculo inexistente")
+		return models.Remito{}, errors.New("vehiculo inexistente")
 	}
 	_, err := s.empresaRepo.ObtenerEmpresaTransportistaPorId(s.cfg, model.EmpresaTransportistaID)
 	if err != nil {
-		return errors.New("la empresa transportista no existe")
+		return models.Remito{}, errors.New("la empresa transportista no existe")
 	}
 
 	if !model.AcopladoID.IsZero() {
 		acoplado, _ := s.acopladoRepo.ObtenerAcopladoPorID(s.cfg, model.AcopladoID)
 		if acoplado == nil {
-			return errors.New("el acoplado no existe")
+			return models.Remito{}, errors.New("el acoplado no existe")
 		}
 		tipoRequerido, ok := tipoAcopladoCompatible[vehiculo.Tipo]
 		if !ok || acoplado.Tipo != tipoRequerido {
-			return fmt.Errorf("un vehículo tipo %q no admite un acoplado tipo %q", vehiculo.Tipo, acoplado.Tipo)
+			return models.Remito{}, fmt.Errorf("un vehículo tipo %q no admite un acoplado tipo %q", vehiculo.Tipo, acoplado.Tipo)
 		}
 	}
 
@@ -103,17 +107,17 @@ func (s RemitoService) CrearRemito(model models.Remito) error {
 		Estado:      &enCurso,
 	})
 	if err != nil {
-		return err
+		return models.Remito{}, err
 	}
 	if len(remitosEnCurso) > 0 {
-		return errors.New("ya tenés un remito en curso — finalizalo antes de iniciar otro")
+		return models.Remito{}, errors.New("ya tenés un remito en curso — finalizalo antes de iniciar otro")
 	}
 
 	// numero_remito es autoincremental y global (no por camionero) — sigue
 	// la numeración del talonario físico que reemplaza.
 	numeroMaximo, err := s.repo.ObtenerNumeroRemitoMaximo(s.cfg)
 	if err != nil {
-		return err
+		return models.Remito{}, err
 	}
 	model.NumeroRemito = numeroMaximo + 1
 
@@ -123,7 +127,20 @@ func (s RemitoService) CrearRemito(model models.Remito) error {
 		model.EstadoSincronizacion = models.EstadoSincronizado
 	}
 	model.EstadoRemito = models.EstadoRemitoEnCurso
-	return s.repo.CrearRemito(s.cfg, model)
+
+	// Se genera el ID acá (en vez de dejar que Mongo lo asigne en el
+	// InsertOne) porque el InsertOne no lo devuelve escrito de vuelta sobre
+	// el struct que le pasamos.
+	model.ID = primitive.NewObjectID()
+
+	if err := s.repo.CrearRemito(s.cfg, model); err != nil {
+		return models.Remito{}, err
+	}
+
+	if s.hub != nil {
+		s.hub.Notificar("remito_creado", map[string]string{"remitoId": model.ID.Hex()})
+	}
+	return model, nil
 }
 
 // ObtenerRemitos devuelve remitos según el rol de quien pregunta.

@@ -71,29 +71,15 @@ function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
     fetchRemitos();
   }, [fetchRemitos]);
 
-  // Tiempo real: cuando otro usuario sincroniza o finaliza un remito, no
-  // llega el objeto completo por el socket — alcanza con volver a pedir
-  // la lista para que quede al día.
-  useEventosSSE({
-    remito_sincronizado: fetchRemitos,
-    remito_finalizado: fetchRemitos,
-  });
-
-  // Abre el detalle de un remito (líneas + resultados) — lo usan tanto "Ver
-  // detalle" como la búsqueda por código de muestra. lineaAResaltar marca
-  // la fila que hay que destacar en la tabla de líneas (null si se entró
-  // por el botón normal, sin ninguna línea puntual en mente).
-  async function abrirDetalleRemito(
-    remito: any,
-    lineaAResaltar: string | null = null,
-  ) {
-    setRemitoSeleccionado(remito);
-    setLineaResaltadaId(lineaAResaltar);
+  // Trae líneas + resultados de un remito puntual — la usan tanto
+  // abrirDetalleRemito (al entrar al detalle) como los eventos SSE de línea
+  // de más abajo, para refrescar el detalle abierto sin que el Encargado
+  // tenga que recargar la página a mano.
+  const refrescarLineasYResultados = useCallback(async (remitoId: string) => {
     setCargandoDetalle(true);
-
     try {
       const responseLineas = await fetchConToken(
-        `${API_URL}/api/v1/lineaRecoleccion/remito/${remito.id}`,
+        `${API_URL}/api/v1/lineaRecoleccion/remito/${remitoId}`,
       );
       const dataLineas = await responseLineas.json();
       setLineasDelRemito(dataLineas || []);
@@ -108,12 +94,47 @@ function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
     } finally {
       setCargandoDetalle(false);
     }
+  }, []);
+
+  // Abre el detalle de un remito (líneas + resultados) — lo usan tanto "Ver
+  // detalle" como la búsqueda por código de muestra. lineaAResaltar marca
+  // la fila que hay que destacar en la tabla de líneas (null si se entró
+  // por el botón normal, sin ninguna línea puntual en mente).
+  async function abrirDetalleRemito(
+    remito: any,
+    lineaAResaltar: string | null = null,
+  ) {
+    setRemitoSeleccionado(remito);
+    setLineaResaltadaId(lineaAResaltar);
+    await refrescarLineasYResultados(remito.id);
   }
 
   // Se ejecuta cuando el usuario clickea "Ver detalle" de un remito
   function verDetalleRemito(remito: any) {
     abrirDetalleRemito(remito);
   }
+
+  // Tiempo real: los eventos solo traen IDs, así que la reacción es
+  // refrescar lo que corresponda en vez de parchear estado con datos
+  // parciales. remito_creado afecta la lista (puede ser un remito nuevo
+  // "en curso" que todavía no se ve); linea_creada/linea_actualizada no
+  // cambian nada a nivel remito, así que solo tiene sentido refrescar el
+  // detalle si hay uno abierto — y solo si es el remito afectado.
+  useEventosSSE({
+    remito_sincronizado: fetchRemitos,
+    remito_finalizado: fetchRemitos,
+    remito_creado: fetchRemitos,
+    linea_creada: (datos: any) => {
+      if (remitoSeleccionado && datos?.remitoId === remitoSeleccionado.id) {
+        refrescarLineasYResultados(remitoSeleccionado.id);
+      }
+    },
+    linea_actualizada: (datos: any) => {
+      if (remitoSeleccionado && datos?.lineaId) {
+        refrescarLineasYResultados(remitoSeleccionado.id);
+      }
+    },
+  });
 
   function volverALista() {
     setRemitoSeleccionado(null);

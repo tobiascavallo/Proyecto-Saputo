@@ -29,6 +29,7 @@ type CamioneroResponse struct {
 	UsuarioNombre              string `json:"usuario_nombre"`
 	UsuarioDNI                 string `json:"usuario_dni"`
 	UsuarioTelefono            string `json:"usuario_telefono"`
+	UsuarioEmail               string `json:"usuario_email"`
 	EmpresaTransportistaID     string `json:"empresa_transportista_id"`
 	EmpresaTransportistaNombre string `json:"empresa_transportista_nombre"`
 	Activo                     bool   `json:"activo"`
@@ -59,13 +60,14 @@ func CrearCamioneroRequestToModel(req CrearCamioneroRequest) (models.Camionero, 
 	}, nil
 }
 
-func CamioneroToResponse(c models.Camionero, usuarioNombre string, usuarioDNI string, usuarioTelefono string, empresaNombre string) CamioneroResponse {
+func CamioneroToResponse(c models.Camionero, usuarioNombre string, usuarioDNI string, usuarioTelefono string, usuarioEmail string, empresaNombre string) CamioneroResponse {
 	return CamioneroResponse{
 		ID:                         c.ID.Hex(),
 		UsuarioID:                  c.UsuarioID.Hex(),
 		UsuarioNombre:              usuarioNombre,
 		UsuarioDNI:                 usuarioDNI,
 		UsuarioTelefono:            usuarioTelefono,
+		UsuarioEmail:               usuarioEmail,
 		EmpresaTransportistaID:     c.EmpresaTransportistaID.Hex(),
 		EmpresaTransportistaNombre: empresaNombre,
 		Activo:                     c.Activo,

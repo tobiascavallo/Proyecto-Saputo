@@ -189,7 +189,7 @@ func main() {
 		solicitud.PATCH("/:id/decision", middleware.RequiereRol("encargado"), solicitudHandler.TomarDecision)
 	}
 
-	lineaService := services.NewLineaRecoleccionService(lineaRepo, remitoRepo, tamboRepo, solicitudRepo, cfg)
+	lineaService := services.NewLineaRecoleccionService(lineaRepo, remitoRepo, tamboRepo, solicitudRepo, cfg, hubSSE)
 	lineaHandler := handlers.NewLineaRecoleccionHandler(lineaService)
 
 	linea := r.Group("/api/v1/lineaRecoleccion")

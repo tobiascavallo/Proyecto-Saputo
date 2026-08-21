@@ -16,8 +16,11 @@ import { API_URL, fetchConToken } from "./api";
 export type TipoEventoSSE =
   | "conectado"
   | "heartbeat"
+  | "remito_creado"
   | "remito_sincronizado"
   | "remito_finalizado"
+  | "linea_creada"
+  | "linea_actualizada"
   | "solicitud_creada"
   | "solicitud_resuelta"
   | "resultado_cargado"
@@ -28,8 +31,11 @@ type ManejadoresSSE = Partial<Record<TipoEventoSSE, (datos: any) => void>>;
 const TIPOS_EVENTO: TipoEventoSSE[] = [
   "conectado",
   "heartbeat",
+  "remito_creado",
   "remito_sincronizado",
   "remito_finalizado",
+  "linea_creada",
+  "linea_actualizada",
   "solicitud_creada",
   "solicitud_resuelta",
   "resultado_cargado",

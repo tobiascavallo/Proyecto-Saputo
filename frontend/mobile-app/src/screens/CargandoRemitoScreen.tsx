@@ -6,12 +6,20 @@ import { useRemitoActivo } from '../hooks/useRemitoActivo';
 // finalizar un remito): resuelve si el camionero tiene un viaje en curso y
 // navega directo, sin que tenga que buscarlo — Regla de negocio #2.
 export const CargandoRemitoScreen = ({ navigation }: any) => {
-  const { data: remito, isLoading, isError, refetch } = useRemitoActivo();
+  // isFetching, no isLoading: en TanStack Query v5 isLoading solo es true en
+  // el primer fetch de la query. refetchOnMount:"always" (ver
+  // useRemitoActivo) sí dispara un refetch de fondo cada vez que esta
+  // pantalla se vuelve a montar — como pasa después de crear o finalizar un
+  // remito — pero con isLoading ya en false y "remito" todavía apuntando al
+  // dato viejo cacheado. El efecto de abajo navegaba con ese dato viejo
+  // antes de que llegara la respuesta fresca, dejando al camionero varado
+  // en la pantalla de origen sin ningún error visible.
+  const { data: remito, isFetching, isError, refetch } = useRemitoActivo();
 
   useEffect(() => {
-    if (isLoading || isError) return;
+    if (isFetching || isError) return;
     navigation.replace(remito ? 'RemitoActivo' : 'IniciarRecorrido');
-  }, [isLoading, isError, remito, navigation]);
+  }, [isFetching, isError, remito, navigation]);
 
   if (isError) {
     return (

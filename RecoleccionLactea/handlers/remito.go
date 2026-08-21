@@ -8,7 +8,7 @@ import (
 )
 
 type RemitoService interface {
-	CrearRemito(model models.Remito) error
+	CrearRemito(model models.Remito) (models.Remito, error)
 	ObtenerRemitos(rolUsuario string, camioneroID primitive.ObjectID, estado string, camioneroIDFiltro string) ([]models.Remito, error)
 	ObtenerRemitoPorID(id primitive.ObjectID, rolUsuario string, camioneroID primitive.ObjectID) (*models.Remito, error)
 	ObtenerRemitosPorEstado(camioneroID primitive.ObjectID, estado models.EstadoRemito) ([]models.Remito, error)
@@ -41,12 +41,16 @@ func (h RemitoHandler) CrearRemito(c *gin.Context) {
 
 	remito.CamioneroID = camioneroID
 
-	if err := h.service.CrearRemito(remito); err != nil {
+	remitoCreado, err := h.service.CrearRemito(remito)
+	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(201, gin.H{"mensaje": "remito creado correctamente"})
+	c.JSON(201, gin.H{
+		"mensaje": "remito creado correctamente",
+		"remito":  dto.RemitoToResponse(remitoCreado),
+	})
 }
 
 // ObtenerRemitos — endpoint único de listado de remitos.

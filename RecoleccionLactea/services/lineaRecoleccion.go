@@ -37,6 +37,7 @@ type LineaRecoleccionService struct {
 	tamboRepo     TamboRepositoryParaLinea
 	solicitudRepo SolicitudEdicionRepositoryParaLinea
 	cfg           config.Config
+	hub           NotificadorSSE
 }
 
 func NewLineaRecoleccionService(
@@ -45,6 +46,7 @@ func NewLineaRecoleccionService(
 	tamboRepo TamboRepositoryParaLinea,
 	solicitudRepo SolicitudEdicionRepositoryParaLinea,
 	cfg config.Config,
+	hub NotificadorSSE,
 ) LineaRecoleccionService {
 	return LineaRecoleccionService{
 		repo:          repo,
@@ -52,6 +54,7 @@ func NewLineaRecoleccionService(
 		tamboRepo:     tamboRepo,
 		solicitudRepo: solicitudRepo,
 		cfg:           cfg,
+		hub:           hub,
 	}
 }
 
@@ -91,7 +94,24 @@ func (s LineaRecoleccionService) CrearLineaRecoleccion(model models.LineaRecolec
 		return errors.New("tambo no encontrado")
 	}
 
-	return s.repo.CrearLineaRecoleccion(s.cfg, model)
+	// Se genera el ID acá (en vez de dejar que Mongo lo asigne en el
+	// InsertOne) porque el InsertOne no lo devuelve escrito de vuelta sobre
+	// el struct que le pasamos, y lo necesitamos para el evento SSE.
+	model.ID = primitive.NewObjectID()
+
+	if err := s.repo.CrearLineaRecoleccion(s.cfg, model); err != nil {
+		return err
+	}
+
+	// linea_creada es el evento más importante del sistema — le avisa al
+	// Encargado en tiempo real que acaba de entrar leche de un tambo.
+	if s.hub != nil {
+		s.hub.Notificar("linea_creada", map[string]string{
+			"lineaId":  model.ID.Hex(),
+			"remitoId": model.RemitoID.Hex(),
+		})
+	}
+	return nil
 }
 
 // ObtenerLineas devuelve todas las líneas de recolección.
@@ -164,5 +184,15 @@ func (s LineaRecoleccionService) ActualizarLineaRecoleccion(id primitive.ObjectI
 	}
 	// TODO: verificar que existe una solicitud de edición aprobada para esta línea
 	// cuando se implemente SolicitudEdicion
-	return s.repo.ActualizarLineaRecoleccion(s.cfg, id, model)
+	if err := s.repo.ActualizarLineaRecoleccion(s.cfg, id, model); err != nil {
+		return err
+	}
+
+	// Mismo criterio que ResultadoAnalisisService.ActualizarResultado: es una
+	// corrección sobre un dato ya cargado, el Encargado tiene que verla sin
+	// recargar la página.
+	if s.hub != nil {
+		s.hub.Notificar("linea_actualizada", map[string]string{"lineaId": id.Hex()})
+	}
+	return nil
 }
