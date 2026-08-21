@@ -60,15 +60,15 @@ func CrearVehiculoRequestToModel(req CrearVehiculoRequest) (models.Vehiculo, err
 	}, nil
 }
 
+// TieneCisternaPropia no se aplana acá a propósito — viaja como puntero
+// directo a VehiculoService.ActualizarVehiculo, para no perder la
+// distinción entre "no lo mandaron" y "lo mandaron en false" (ver comentario
+// en ese método).
 func ActualizarVehiculoRequestToModel(req ActualizarVehiculoRequest) (models.Vehiculo, error) {
 	vehiculo := models.Vehiculo{
 		Patente:            req.Patente,
 		HabilitacionSenasa: req.HabilitacionSenasa,
 		Tipo:               models.TipoVehiculo(req.Tipo),
-	}
-
-	if req.TieneCisternaPropia != nil {
-		vehiculo.TieneCisternaPropia = *req.TieneCisternaPropia
 	}
 
 	if req.EmpresaTransportistaID != "" {

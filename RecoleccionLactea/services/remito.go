@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/tobiascavallo/RecoleccionLactea/config"
 	"github.com/tobiascavallo/RecoleccionLactea/models"
@@ -12,8 +13,18 @@ type RemitoRepository interface {
 	CrearRemito(cfg config.Config, model models.Remito) error
 	ObtenerRemitosFiltrados(cfg config.Config, filtro models.RemitoFiltro) ([]models.Remito, error)
 	ObtenerRemitoPorID(cfg config.Config, ID primitive.ObjectID) (*models.Remito, error)
+	ObtenerNumeroRemitoMaximo(cfg config.Config) (int, error)
 	ActualizarEstadoSincronizacion(cfg config.Config, id primitive.ObjectID, estado models.EstadoSincronizacion) error
 	ActualizarEstadoRemito(cfg config.Config, id primitive.ObjectID, estado models.EstadoRemito) error
+}
+
+// tipoAcopladoCompatible define qué tipo de acoplado puede enganchar cada
+// tipo de vehículo: un camión lleva un acoplado con ejes propios (enganche
+// por lanza); un tractor solo lleva un semirremolque, que se apoya sobre el
+// tractor en vez de tener ejes propios.
+var tipoAcopladoCompatible = map[models.TipoVehiculo]models.TipoAcoplado{
+	models.Camion:              models.AcopladoSimple,
+	models.TractorSemiRemolque: models.Semirremolque,
 }
 
 type VehiculoRepositoryParaRemito interface {
@@ -70,12 +81,42 @@ func (s RemitoService) CrearRemito(model models.Remito) error {
 	if err != nil {
 		return errors.New("la empresa transportista no existe")
 	}
+
 	if !model.AcopladoID.IsZero() {
 		acoplado, _ := s.acopladoRepo.ObtenerAcopladoPorID(s.cfg, model.AcopladoID)
 		if acoplado == nil {
 			return errors.New("el acoplado no existe")
 		}
+		tipoRequerido, ok := tipoAcopladoCompatible[vehiculo.Tipo]
+		if !ok || acoplado.Tipo != tipoRequerido {
+			return fmt.Errorf("un vehículo tipo %q no admite un acoplado tipo %q", vehiculo.Tipo, acoplado.Tipo)
+		}
 	}
+
+	// Un camionero solo puede tener un remito en curso a la vez — evita que
+	// un doble tap o un reintento de red genere dos viajes simultáneos. Es
+	// un chequeo a nivel aplicación (mismo criterio que el resto de las
+	// validaciones de unicidad del proyecto), no un índice único de Mongo.
+	enCurso := models.EstadoRemitoEnCurso
+	remitosEnCurso, err := s.repo.ObtenerRemitosFiltrados(s.cfg, models.RemitoFiltro{
+		CamioneroID: &model.CamioneroID,
+		Estado:      &enCurso,
+	})
+	if err != nil {
+		return err
+	}
+	if len(remitosEnCurso) > 0 {
+		return errors.New("ya tenés un remito en curso — finalizalo antes de iniciar otro")
+	}
+
+	// numero_remito es autoincremental y global (no por camionero) — sigue
+	// la numeración del talonario físico que reemplaza.
+	numeroMaximo, err := s.repo.ObtenerNumeroRemitoMaximo(s.cfg)
+	if err != nil {
+		return err
+	}
+	model.NumeroRemito = numeroMaximo + 1
+
 	if model.CreadoOffline {
 		model.EstadoSincronizacion = models.EstadoPendiente
 	} else {

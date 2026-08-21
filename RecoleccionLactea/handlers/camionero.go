@@ -11,7 +11,7 @@ type CamioneroService interface {
 	CrearCamionero(model models.Camionero) error
 	ObtenerCamioneros() ([]models.Camionero, error)
 	ObtenerCamioneroPorID(id primitive.ObjectID) (*models.Camionero, error)
-	ObtenerCamioneroPorUsuarioID(usuarioID primitive.ObjectID) (*models.Camionero, error)
+	ObtenerCamioneroPorUsuarioID(usuarioID primitive.ObjectID, rolUsuario string, usuarioIDToken primitive.ObjectID) (*models.Camionero, error)
 	ActualizarCamionero(id primitive.ObjectID, model models.Camionero) error
 	DesactivarCamionero(id primitive.ObjectID) error
 	ActivarCamionero(id primitive.ObjectID) error
@@ -152,9 +152,13 @@ func (h CamioneroHandler) ObtenerCamioneroPorUsuarioID(c *gin.Context) {
 		return
 	}
 
-	camionero, err := h.service.ObtenerCamioneroPorUsuarioID(usuarioID)
+	rolUsuario, _ := c.Get("rol")
+	usuarioIDTokenStr, _ := c.Get("usuario_id")
+	usuarioIDToken, _ := primitive.ObjectIDFromHex(usuarioIDTokenStr.(string))
+
+	camionero, err := h.service.ObtenerCamioneroPorUsuarioID(usuarioID, rolUsuario.(string), usuarioIDToken)
 	if err != nil {
-		c.JSON(404, gin.H{"error": "el camionero no tiene datos completados"})
+		c.JSON(404, gin.H{"error": err.Error()})
 		return
 	}
 

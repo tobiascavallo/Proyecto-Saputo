@@ -13,7 +13,7 @@ type LineaRecoleccionService interface {
 	CrearLineaRecoleccion(model models.LineaRecoleccion, camioneroID primitive.ObjectID) error
 	ObtenerLineas() ([]models.LineaRecoleccion, error)
 	ObtenerLineaPorID(id primitive.ObjectID) (*models.LineaRecoleccion, error)
-	ObtenerLineasPorRemito(remitoID primitive.ObjectID) ([]models.LineaRecoleccion, error)
+	ObtenerLineasPorRemito(remitoID primitive.ObjectID, rolUsuario string, camioneroIDToken primitive.ObjectID) ([]models.LineaRecoleccion, error)
 	ObtenerLineasPorTambo(tamboID primitive.ObjectID) ([]models.LineaRecoleccion, error)
 	ObtenerLineasPorCisterna(remitoID primitive.ObjectID, numeroCisterna int) ([]models.LineaRecoleccion, error)
 	ObtenerLineaPorCodigoMuestra(codigo string) (*models.LineaRecoleccion, error)
@@ -90,7 +90,11 @@ func (h LineaRecoleccionHandler) ObtenerLineasPorRemito(c *gin.Context) {
 		return
 	}
 
-	lineas, err := h.service.ObtenerLineasPorRemito(remitoID)
+	rolUsuario, _ := c.Get("rol")
+	usuarioIDStr, _ := c.Get("usuario_id")
+	camioneroID, _ := primitive.ObjectIDFromHex(usuarioIDStr.(string))
+
+	lineas, err := h.service.ObtenerLineasPorRemito(remitoID, rolUsuario.(string), camioneroID)
 	if err != nil {
 		c.JSON(404, gin.H{"error": err.Error()})
 		return

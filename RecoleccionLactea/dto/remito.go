@@ -8,8 +8,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// CrearRemitoRequest no incluye numero_remito a propósito: es un contador
+// global autoincremental (no por camionero) que asigna el service, siguiendo
+// la numeración del talonario físico que reemplaza.
 type CrearRemitoRequest struct {
-	NumeroRemito           int    `json:"numero_remito"`
 	NumeroRecorrido        int    `json:"numero_recorrido"`
 	Fecha                  string `json:"fecha"`
 	VehiculoID             string `json:"vehiculo_id"`
@@ -49,7 +51,6 @@ func CrearRemitoRequestToModel(req CrearRemitoRequest) (models.Remito, error) {
 	}
 
 	remito := models.Remito{
-		NumeroRemito:           req.NumeroRemito,
 		NumeroRecorrido:        req.NumeroRecorrido,
 		Fecha:                  fecha,
 		VehiculoID:             vehiculoID,

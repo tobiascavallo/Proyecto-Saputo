@@ -8,6 +8,8 @@ import (
 	"github.com/tobiascavallo/RecoleccionLactea/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type RemitoRepositoryImpl struct {
@@ -42,6 +44,25 @@ func (r RemitoRepositoryImpl) ObtenerRemitosFiltrados(cfg config.Config, filtro 
 	var remitos []models.Remito
 	err = cursor.All(context.TODO(), &remitos)
 	return remitos, err
+}
+
+// ObtenerNumeroRemitoMaximo devuelve el numero_remito más alto registrado en
+// toda la base — es un contador global compartido por todos los camioneros,
+// no uno por camionero. Devuelve 0 si todavía no hay remitos (el primero
+// arranca en 1).
+func (r RemitoRepositoryImpl) ObtenerNumeroRemitoMaximo(cfg config.Config) (int, error) {
+	collection := db.DB.Database(cfg.MongoDB).Collection("remitos")
+	opts := options.FindOne().SetSort(bson.M{"numero_remito": -1})
+
+	var remito models.Remito
+	err := collection.FindOne(context.TODO(), bson.M{}, opts).Decode(&remito)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return remito.NumeroRemito, nil
 }
 
 func (r RemitoRepositoryImpl) ObtenerRemitoPorID(cfg config.Config, ID primitive.ObjectID) (*models.Remito, error) {

@@ -96,14 +96,27 @@ func (s CamioneroService) ObtenerCamioneroPorID(id primitive.ObjectID) (*models.
 }
 
 // ObtenerCamioneroPorUsuarioID busca el registro de camionero asociado a un
-// usuario puntual. Se usa desde el frontend para completar el detalle de un
-// camionero (empresa transportista) a partir de su usuario_id — por ejemplo,
-// desde el modal de NombreUsuario.tsx en Remitos o Solicitudes de edición.
-func (s CamioneroService) ObtenerCamioneroPorUsuarioID(usuarioID primitive.ObjectID) (*models.Camionero, error) {
+// usuario puntual. Se usa desde el frontend web para completar el detalle de
+// un camionero (empresa transportista) a partir de su usuario_id — por
+// ejemplo, desde el modal de NombreUsuario.tsx en Remitos o Solicitudes de
+// edición — y desde la app móvil, para que el propio camionero resuelva su
+// empresa transportista al iniciar un recorrido.
+//
+// Si quien pregunta es camionero, usuarioID tiene que ser el suyo — evita
+// que consulte la empresa de otro camionero cambiando el ID en la URL.
+// Mismo patrón que RemitoService.ObtenerRemitoPorID.
+func (s CamioneroService) ObtenerCamioneroPorUsuarioID(usuarioID primitive.ObjectID, rolUsuario string, usuarioIDToken primitive.ObjectID) (*models.Camionero, error) {
 	if usuarioID.IsZero() {
 		return nil, errors.New("ID de usuario inválido")
 	}
-	return s.repo.ObtenerCamioneroPorUsuarioID(s.cfg, usuarioID)
+	if rolUsuario == string(models.RolCamionero) && usuarioID != usuarioIDToken {
+		return nil, errors.New("no tenés permiso para ver los datos de otro camionero")
+	}
+	camionero, err := s.repo.ObtenerCamioneroPorUsuarioID(s.cfg, usuarioID)
+	if err != nil {
+		return nil, errors.New("el camionero no tiene datos completados")
+	}
+	return camionero, nil
 }
 
 // ActualizarCamionero solo permite reasignar la empresa transportista — el

@@ -47,6 +47,10 @@ func (s VehiculoService) CrearVehiculo(model models.Vehiculo) error {
 		return err
 	}
 
+	if model.Tipo == models.TractorSemiRemolque && model.TieneCisternaPropia {
+		return errors.New("un tractor con semirremolque no puede tener cisterna propia")
+	}
+
 	if model.HabilitacionSenasa == "" {
 		return errors.New("la habilitación SENASA es requerida")
 	}
@@ -82,7 +86,13 @@ func (s VehiculoService) ObtenerVehiculoPorID(id primitive.ObjectID) (*models.Ve
 // sobre el registro existente antes de guardar — el repositorio hace un
 // $set del struct completo, así que dejar un campo en su valor cero
 // (incluido "activo") lo pisaría en la base en vez de conservarlo.
-func (s VehiculoService) ActualizarVehiculo(id primitive.ObjectID, model models.Vehiculo) error {
+//
+// tieneCisternaPropia viaja aparte, como puntero: es un bool, así que
+// "no lo mandaron" (nil) y "lo mandaron en false" no se pueden distinguir
+// una vez aplanado a un models.Vehiculo — si se aplanara antes de llegar
+// acá, una edición que solo cambia la patente pisaría en silencio un
+// tiene_cisterna_propia:true existente a false.
+func (s VehiculoService) ActualizarVehiculo(id primitive.ObjectID, model models.Vehiculo, tieneCisternaPropia *bool) error {
 	if id.IsZero() {
 		return errors.New("ID inválido")
 	}
@@ -123,7 +133,16 @@ func (s VehiculoService) ActualizarVehiculo(id primitive.ObjectID, model models.
 		vehiculoExistente.Tipo = model.Tipo
 	}
 
-	vehiculoExistente.TieneCisternaPropia = model.TieneCisternaPropia
+	if tieneCisternaPropia != nil {
+		vehiculoExistente.TieneCisternaPropia = *tieneCisternaPropia
+	}
+
+	// Se valida la combinación resultante (no solo lo que vino en este
+	// pedido) — un tractor con semirremolque nunca tiene cisterna propia,
+	// sin importar si lo que cambió fue el tipo o la cisterna.
+	if vehiculoExistente.Tipo == models.TractorSemiRemolque && vehiculoExistente.TieneCisternaPropia {
+		return errors.New("un tractor con semirremolque no puede tener cisterna propia")
+	}
 
 	return s.repo.ActualizarVehiculo(s.cfg, id, *vehiculoExistente)
 }

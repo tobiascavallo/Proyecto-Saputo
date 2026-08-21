@@ -11,7 +11,7 @@ type VehiculoService interface {
 	CrearVehiculo(model models.Vehiculo) error
 	ObtenerVehiculos() ([]models.Vehiculo, error)
 	ObtenerVehiculoPorID(id primitive.ObjectID) (*models.Vehiculo, error)
-	ActualizarVehiculo(id primitive.ObjectID, model models.Vehiculo) error
+	ActualizarVehiculo(id primitive.ObjectID, model models.Vehiculo, tieneCisternaPropia *bool) error
 	DesactivarVehiculo(id primitive.ObjectID) error
 	ActivarVehiculo(id primitive.ObjectID) error
 	ObtenerVehiculosPorEmpresa(empresaID primitive.ObjectID) ([]models.Vehiculo, error)
@@ -96,7 +96,7 @@ func (h VehiculoHandler) ActualizarVehiculo(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.ActualizarVehiculo(id, vehiculo); err != nil {
+	if err := h.service.ActualizarVehiculo(id, vehiculo, req.TieneCisternaPropia); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}

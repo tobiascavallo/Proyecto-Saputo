@@ -81,7 +81,7 @@ func main() {
 		camionero.POST("", middleware.RequiereRol("encargado"), camioneroHandler.CrearCamionero)
 		camionero.GET("", middleware.RequiereRol("encargado", "empleado"), camioneroHandler.ObtenerCamioneros)
 		camionero.GET("/:id", middleware.RequiereRol("encargado", "empleado"), camioneroHandler.ObtenerCamioneroPorID)
-		camionero.GET("/usuario/:usuarioId", middleware.RequiereRol("encargado", "empleado"), camioneroHandler.ObtenerCamioneroPorUsuarioID)
+		camionero.GET("/usuario/:usuarioId", middleware.RequiereRol("encargado", "empleado", "camionero"), camioneroHandler.ObtenerCamioneroPorUsuarioID)
 		camionero.PUT("/:id", middleware.RequiereRol("encargado"), camioneroHandler.ActualizarCamionero)
 		camionero.DELETE("/:id", middleware.RequiereRol("encargado"), camioneroHandler.DesactivarCamionero)
 		camionero.PATCH("/:id/activar", middleware.RequiereRol("encargado"), camioneroHandler.ActivarCamionero)

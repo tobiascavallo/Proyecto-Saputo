@@ -108,13 +108,20 @@ func (s LineaRecoleccionService) ObtenerLineaPorID(id primitive.ObjectID) (*mode
 }
 
 // ObtenerLineasPorRemito devuelve todas las líneas de un remito específico.
-func (s LineaRecoleccionService) ObtenerLineasPorRemito(remitoID primitive.ObjectID) ([]models.LineaRecoleccion, error) {
+// Si quien pregunta es camionero, el remito tiene que ser suyo — evita que
+// pueda leer las líneas (litros, tambo, códigos de muestra) de un viaje
+// ajeno adivinando el remitoId. Encargado/empleado no tienen esa
+// restricción. Mismo patrón que RemitoService.ObtenerRemitoPorID.
+func (s LineaRecoleccionService) ObtenerLineasPorRemito(remitoID primitive.ObjectID, rolUsuario string, camioneroIDToken primitive.ObjectID) ([]models.LineaRecoleccion, error) {
 	if remitoID.IsZero() {
 		return nil, errors.New("ID de remito inválido")
 	}
-	_, err := s.remitoRepo.ObtenerRemitoPorID(s.cfg, remitoID)
+	remito, err := s.remitoRepo.ObtenerRemitoPorID(s.cfg, remitoID)
 	if err != nil {
 		return nil, errors.New("remito no encontrado")
+	}
+	if rolUsuario == string(models.RolCamionero) && remito.CamioneroID != camioneroIDToken {
+		return nil, errors.New("no tenés permiso para ver las líneas de este remito")
 	}
 	return s.repo.ObtenerLineasPorRemito(s.cfg, remitoID)
 }
