@@ -1,155 +1,153 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ActivityIndicator } from 'react-native';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { useRemitoActivo } from '../hooks/useRemitoActivo';
+import { enqueueLine } from '../utils/syncManager';
 import { api } from '../api/client';
-import { ahoraISO } from '../utils/fecha';
+import { queryClient } from '../api/QueryClient';
 
-export const AgregarLineaScreen = ({ navigation, route }: any) => {
-  const { remitoId, cantidadCisternas } = route.params;
-  const queryClient = useQueryClient();
+export const AgregarLineaScreen = ({ route, navigation }: any) => {
+  const { data: remitoActivo } = useRemitoActivo();
+  const remitoId = route.params?.remitoId || remitoActivo?.id;
+  
+  const { isOnline } = useNetworkStatus();
 
   const [tamboId, setTamboId] = useState('');
   const [litros, setLitros] = useState('');
   const [temperatura, setTemperatura] = useState('');
-  const [cisterna, setCisterna] = useState<number | null>(cantidadCisternas === 1 ? 1 : null);
-  const [codigoMuestraDiaria, setCodigoMuestraDiaria] = useState('');
-  const [codigoMuestraUfc, setCodigoMuestraUfc] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { data: tambos, isLoading: loadingTambos } = useQuery({
-    queryKey: ['tambos'],
-    queryFn: async () => {
-      const res = await api.get('/tambo');
-      return res.data || [];
-    },
-  });
-
-  const mutation = useMutation({
-    mutationFn: async (payload: any) => {
-      const res = await api.post('/lineaRecoleccion', payload);
-      return res.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lineasDelRemito', remitoId] });
-      Alert.alert('Éxito', 'Línea de recolección registrada correctamente');
-      navigation.goBack();
-    },
-    onError: (err: any) => {
-      Alert.alert('Error', err.response?.data?.error || 'Error al registrar la línea');
-    },
-  });
-
-  const handleSubmit = () => {
-    if (!tamboId || !litros || !temperatura || !cisterna || !codigoMuestraDiaria) {
-      Alert.alert('Atención', 'Completá todos los campos obligatorios');
+  const handleGuardarLinea = async () => {
+    if (!tamboId || !litros || !temperatura) {
+      Alert.alert('Atención', 'Por favor completa todos los campos requeridos.');
       return;
     }
 
-    mutation.mutate({
-      remito_id: remitoId,
-      tambo_id: tamboId,
-      litros_recibidos: parseFloat(litros),
-      temperatura_celcius: parseFloat(temperatura),
-      numero_cisterna: cisterna,
-      hora_recoleccion: ahoraISO(),
-      codigo_muestra_diaria: codigoMuestraDiaria,
-      codigo_muestra_ufc: codigoMuestraUfc || undefined,
-    });
+    if (!remitoId) {
+      Alert.alert('Error', 'No se encontró un remito activo asociado.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const payloadLinea = {
+      remitoId,
+      tamboId,
+      litros: parseFloat(litros),
+      temperatura: parseFloat(temperatura),
+      fechaCreacion: new Date().toISOString(),
+    };
+
+    try {
+      if (isOnline) {
+        // 🟢 ONLINE: Envío directo al backend en Go
+        await api.post(`/remitos/${remitoId}/lineas`, payloadLinea);
+        Alert.alert('Éxito', 'Línea de recolección guardada y sincronizada.');
+      } else {
+        // 🔴 OFFLINE: Guardado en cola local (AsyncStorage)
+        await enqueueLine({
+          idLocal: `local_${Date.now()}`,
+          ...payloadLinea,
+        });
+        Alert.alert(
+          'Guardado en Celular',
+          'Modo sin señal: La recolección se guardó localmente y se enviará de forma automática al recuperar conexión.'
+        );
+      }
+
+      // Refresca la caché local para actualizar la vista de RemitoActivoScreen
+      queryClient.invalidateQueries({ queryKey: ['remitoActivo'] });
+      navigation.goBack();
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.error || 'No se pudo guardar la línea.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.label}>Tambo / Establecimiento (*)</Text>
-      {loadingTambos ? (
-        <ActivityIndicator color="#2b6cb0" />
-      ) : (
-        <View style={styles.optionList}>
-          {(tambos || []).map((t: any) => (
-            <TouchableOpacity
-              key={t.id}
-              style={[styles.option, tamboId === t.id && styles.selectedOption]}
-              onPress={() => setTamboId(t.id)}
-            >
-              <Text style={[styles.optionText, tamboId === t.id && styles.selectedOptionText]}>
-                Tambo N° {t.numero_tambo} — {t.tambero_nombre}
-              </Text>
-            </TouchableOpacity>
-          ))}
+    <View style={styles.container}>
+      {!isOnline && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineText}>
+            ⚠️ Sin conexión: Registro en almacenamiento local
+          </Text>
         </View>
       )}
 
-      <Text style={styles.label}>Litros Recolectados (*)</Text>
+      <Text style={styles.label}>ID / Código de Tambo</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
-        placeholder="Ej: 4500.5"
+        value={tamboId}
+        onChangeText={setTamboId}
+        placeholder="Ej: TAMBO-01"
+        autoCapitalize="characters"
+      />
+
+      <Text style={styles.label}>Litros Recolectados</Text>
+      <TextInput
+        style={styles.input}
         value={litros}
         onChangeText={setLitros}
+        keyboardType="numeric"
+        placeholder="Ej: 2500"
       />
 
-      <Text style={styles.label}>Temperatura °C (*)</Text>
+      <Text style={styles.label}>Temperatura (°C)</Text>
       <TextInput
         style={styles.input}
-        keyboardType="numeric"
-        placeholder="Ej: 3.8"
         value={temperatura}
         onChangeText={setTemperatura}
-      />
-
-      <Text style={styles.label}>Cisterna (*)</Text>
-      <View style={styles.optionList}>
-        {Array.from({ length: cantidadCisternas }, (_, i) => i + 1).map((n) => (
-          <TouchableOpacity
-            key={n}
-            style={[styles.option, cisterna === n && styles.selectedOption]}
-            onPress={() => setCisterna(n)}
-          >
-            <Text style={[styles.optionText, cisterna === n && styles.selectedOptionText]}>
-              Cisterna N° {n}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={styles.label}>Código de Muestra Diaria (*)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Ej: MUEST-2026-001"
-        value={codigoMuestraDiaria}
-        onChangeText={setCodigoMuestraDiaria}
-      />
-
-      <Text style={styles.label}>Código de Muestra UFC</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Opcional"
-        value={codigoMuestraUfc}
-        onChangeText={setCodigoMuestraUfc}
+        keyboardType="decimal-pad"
+        placeholder="Ej: 3.5"
       />
 
       <TouchableOpacity
-        style={styles.submitButton}
-        onPress={handleSubmit}
-        disabled={mutation.isPending}
+        style={[styles.button, isSubmitting && styles.buttonDisabled]}
+        onPress={handleGuardarLinea}
+        disabled={isSubmitting}
       >
-        {mutation.isPending ? (
-          <ActivityIndicator color="#fff" />
+        {isSubmitting ? (
+          <ActivityIndicator color="#ffffff" />
         ) : (
-          <Text style={styles.submitButtonText}>GUARDAR LÍNEA</Text>
+          <Text style={styles.buttonText}>
+            {isOnline ? 'Guardar y Enviar' : 'Guardar Localmente'}
+          </Text>
         )}
       </TouchableOpacity>
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#f7fafc' },
-  label: { fontSize: 14, fontWeight: 'bold', color: '#2d3748', marginBottom: 6, marginTop: 10 },
-  input: { backgroundColor: '#fff', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0', fontSize: 16 },
-  optionList: { marginBottom: 10 },
-  option: { padding: 12, backgroundColor: '#edf2f7', borderRadius: 8, marginBottom: 6 },
-  selectedOption: { backgroundColor: '#2b6cb0' },
-  optionText: { color: '#2d3748', fontWeight: 'bold' },
-  selectedOptionText: { color: '#ffffff' },
-  submitButton: { backgroundColor: '#38a169', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 20, marginBottom: 40 },
-  submitButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  container: { flex: 1, padding: 20, backgroundColor: '#f7fafc' },
+  offlineBanner: {
+    backgroundColor: '#feebc8',
+    borderColor: '#fbd38d',
+    borderWidth: 1,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  offlineText: { color: '#c05621', fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  label: { fontSize: 14, fontWeight: '600', color: '#2d3748', marginBottom: 6 },
+  input: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  button: {
+    backgroundColor: '#2b6cb0',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  buttonDisabled: { backgroundColor: '#a0aec0' },
+  buttonText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
 });
