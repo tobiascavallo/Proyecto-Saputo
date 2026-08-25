@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useRemitoActivo } from '../hooks/useRemitoActivo';
+import { getPendingLines } from '../utils/syncManager';
 
 export const RemitoActivoScreen = ({ navigation }: any) => {
   const queryClient = useQueryClient();
@@ -38,8 +39,28 @@ export const RemitoActivoScreen = ({ navigation }: any) => {
     enabled: !!remito?.id,
   });
 
+  // Líneas guardadas offline (AsyncStorage) que todavía no llegaron al
+  // backend — sin esto, una recolección cargada sin señal "desaparece" para
+  // el camionero hasta que useAutoSync la sincronice sola.
+  const { data: lineasPendientes } = useQuery({
+    queryKey: ['lineasPendientes', remito?.id],
+    queryFn: async () => {
+      const todas = await getPendingLines();
+      return todas.filter((l) => l.remitoId === remito.id);
+    },
+    enabled: !!remito?.id,
+  });
+
   const cantidadCisternas =
     (vehiculo?.tiene_cisterna_propia ? 1 : 0) + (remito?.acoplado_id ? 1 : 0);
+
+  const cantidadPendientes = (lineasPendientes || []).length;
+  const totalLineas = (lineas || []).length + cantidadPendientes;
+  // Si hay líneas sin sincronizar no se puede finalizar: el backend
+  // rechazaría esas líneas apenas se sincronicen contra un remito ya
+  // finalizado ("no se pueden agregar líneas a un remito finalizado") y se
+  // perderían en silencio en un reintento infinito.
+  const finalizarBloqueado = totalLineas === 0 || cantidadPendientes > 0;
 
   const finalizarMutation = useMutation({
     mutationFn: async () => {
@@ -98,23 +119,38 @@ export const RemitoActivoScreen = ({ navigation }: any) => {
       <Text style={styles.sectionTitle}>Líneas cargadas en este viaje</Text>
       {loadingLineas ? (
         <ActivityIndicator color="#2b6cb0" />
-      ) : (lineas || []).length === 0 ? (
+      ) : totalLineas === 0 ? (
         <Text style={styles.emptyText}>Todavía no cargaste ningún tambo en este viaje.</Text>
       ) : (
-        (lineas || []).map((linea: any) => (
-          <View key={linea.id} style={styles.lineaCard}>
-            <Text style={styles.lineaTambo}>{nombreTambo(linea.tambo_id)}</Text>
-            <Text style={styles.infoText}>🥛 {linea.litros_recibidos} Lts — 🌡️ {linea.temperatura_celcius}°C</Text>
-            <Text style={styles.infoText}>Cisterna N° {linea.numero_cisterna}</Text>
-            <Text style={styles.infoText}>🧪 {linea.codigo_muestra_diaria}</Text>
-          </View>
-        ))
+        <>
+          {(lineas || []).map((linea: any) => (
+            <View key={linea.id} style={styles.lineaCard}>
+              <Text style={styles.lineaTambo}>{nombreTambo(linea.tambo_id)}</Text>
+              <Text style={styles.infoText}>🥛 {linea.litros_recibidos} Lts — 🌡️ {linea.temperatura_celcius}°C</Text>
+              <Text style={styles.infoText}>Cisterna N° {linea.numero_cisterna}</Text>
+              <Text style={styles.infoText}>🧪 {linea.codigo_muestra_diaria}</Text>
+            </View>
+          ))}
+          {(lineasPendientes || []).map((linea) => (
+            <View key={linea.idLocal} style={[styles.lineaCard, styles.lineaCardPendiente]}>
+              <View style={styles.lineaPendienteHeader}>
+                <Text style={styles.lineaTambo}>{nombreTambo(linea.tamboId)}</Text>
+                <View style={styles.pendienteBadge}>
+                  <Text style={styles.pendienteBadgeText}>⏳ Sin sincronizar</Text>
+                </View>
+              </View>
+              <Text style={styles.infoText}>🥛 {linea.litrosRecibidos} Lts — 🌡️ {linea.temperaturaCelcius}°C</Text>
+              <Text style={styles.infoText}>Cisterna N° {linea.numeroCisterna}</Text>
+              <Text style={styles.infoText}>🧪 {linea.codigoMuestraDiaria}</Text>
+            </View>
+          ))}
+        </>
       )}
 
       <TouchableOpacity
-        style={[styles.finalizarButton, (lineas || []).length === 0 && styles.finalizarButtonDisabled]}
+        style={[styles.finalizarButton, finalizarBloqueado && styles.finalizarButtonDisabled]}
         onPress={() => finalizarMutation.mutate()}
-        disabled={(lineas || []).length === 0 || finalizarMutation.isPending}
+        disabled={finalizarBloqueado || finalizarMutation.isPending}
       >
         {finalizarMutation.isPending ? (
           <ActivityIndicator color="#fff" />
@@ -122,9 +158,14 @@ export const RemitoActivoScreen = ({ navigation }: any) => {
           <Text style={styles.finalizarButtonText}>FINALIZAR REMITO</Text>
         )}
       </TouchableOpacity>
-      {(lineas || []).length === 0 && (
+      {cantidadPendientes > 0 ? (
+        <Text style={styles.hintText}>
+          Tenés {cantidadPendientes} recolección{cantidadPendientes === 1 ? '' : 'es'} sin
+          enviar, esperá a tener señal para finalizar el remito.
+        </Text>
+      ) : totalLineas === 0 ? (
         <Text style={styles.hintText}>Cargá al menos un tambo para poder finalizar.</Text>
-      )}
+      ) : null}
 
       <View style={styles.footerLinks}>
         <TouchableOpacity onPress={() => navigation.navigate('HistorialRemitos')}>
@@ -169,6 +210,10 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#2d3748', marginBottom: 12 },
   emptyText: { color: '#a0aec0', fontStyle: 'italic', marginBottom: 12 },
   lineaCard: { backgroundColor: '#fff', padding: 14, borderRadius: 10, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' },
+  lineaCardPendiente: { borderColor: '#f6ad55', borderStyle: 'dashed', backgroundColor: '#fffaf0' },
+  lineaPendienteHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  pendienteBadge: { backgroundColor: '#dd6b20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  pendienteBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
   lineaTambo: { fontSize: 15, fontWeight: 'bold', color: '#1a365d', marginBottom: 4 },
   infoText: { fontSize: 13, color: '#4a5568', marginBottom: 2 },
   finalizarButton: { backgroundColor: '#e53e3e', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 16 },

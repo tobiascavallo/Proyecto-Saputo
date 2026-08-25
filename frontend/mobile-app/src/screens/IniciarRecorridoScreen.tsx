@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert,
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { fechaDeHoy } from '../utils/fecha';
 
 // Qué tipo de acoplado engancha cada tipo de vehículo — mismo criterio que
@@ -17,6 +18,7 @@ const ACOPLADO_COMPATIBLE: Record<string, string> = {
 export const IniciarRecorridoScreen = ({ navigation }: any) => {
   const { usuarioId } = useAuth();
   const queryClient = useQueryClient();
+  const { isOnline } = useNetworkStatus();
   const [vehiculoId, setVehiculoId] = useState('');
   const [acopladoId, setAcopladoId] = useState('');
   const [numeroRecorrido, setNumeroRecorrido] = useState('');
@@ -91,6 +93,17 @@ export const IniciarRecorridoScreen = ({ navigation }: any) => {
   });
 
   function handleSubmit() {
+    // numero_remito es un contador global que calcula el backend, y la
+    // validación de "un remito en curso por camionero" también corre ahí —
+    // ninguna de las dos se puede resolver sin conexión, así que iniciar un
+    // recorrido exige señal (las líneas sí se pueden cargar offline después).
+    if (!isOnline) {
+      Alert.alert(
+        'Sin conexión',
+        'Necesitás señal para iniciar un recorrido nuevo — probá desde la planta antes de salir.',
+      );
+      return;
+    }
     if (!vehiculoId) {
       Alert.alert('Atención', 'Elegí un vehículo');
       return;
@@ -185,16 +198,24 @@ export const IniciarRecorridoScreen = ({ navigation }: any) => {
           />
 
           <TouchableOpacity
-            style={styles.submitButton}
+            style={[styles.submitButton, !isOnline && styles.submitButtonDisabled]}
             onPress={handleSubmit}
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || !isOnline}
           >
             {mutation.isPending ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.submitButtonText}>INICIAR RECORRIDO</Text>
+              <Text style={styles.submitButtonText}>
+                {isOnline ? 'INICIAR RECORRIDO' : 'SIN SEÑAL — NO SE PUEDE INICIAR'}
+              </Text>
             )}
           </TouchableOpacity>
+          {!isOnline && (
+            <Text style={styles.emptyText}>
+              El número de remito y la validación de recorrido en curso los calcula el
+              servidor — probá desde la planta antes de salir a la ruta.
+            </Text>
+          )}
         </>
       )}
     </ScrollView>
@@ -212,6 +233,7 @@ const styles = StyleSheet.create({
   optionText: { color: '#2d3748', fontWeight: 'bold' },
   selectedOptionText: { color: '#ffffff' },
   emptyText: { color: '#a0aec0', fontStyle: 'italic', marginBottom: 6 },
-  submitButton: { backgroundColor: '#38a169', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 24, marginBottom: 40 },
+  submitButton: { backgroundColor: '#38a169', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 24, marginBottom: 24 },
+  submitButtonDisabled: { backgroundColor: '#cbd5e0' },
   submitButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 });
