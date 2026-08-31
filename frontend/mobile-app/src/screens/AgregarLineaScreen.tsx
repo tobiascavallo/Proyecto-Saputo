@@ -1,10 +1,118 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Modal, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { enqueueLine } from '../utils/syncManager';
 import { ahoraISO } from '../utils/fecha';
+
+// El envase de la muestra trae un código de barras pegado, pero el
+// escáner detecta cualquier formato que llegue a cruzarse (QR incluido)
+// "por las dudas" — no es el caso de uso principal, solo no lo bloqueamos.
+const TIPOS_DE_CODIGO = [
+  'code128', 'ean13', 'ean8', 'upc_a', 'upc_e', 'code39', 'code93', 'codabar', 'itf14',
+  'qr', 'pdf417', 'aztec', 'datamatrix',
+] as const;
+
+// Modal de escaneo — se usa tanto para el código de muestra diaria como
+// para el UFC (el llamador le pasa a qué campo va el resultado). El permiso
+// de cámara se pide recién acá, al abrir, no antes; si falla o lo niegan,
+// se puede cerrar y seguir cargando el código a mano en el formulario.
+function EscanerCodigoModal({
+  visible,
+  onScanned,
+  onCancelar,
+}: {
+  visible: boolean;
+  onScanned: (codigo: string) => void;
+  onCancelar: () => void;
+}) {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [errorCamara, setErrorCamara] = useState(false);
+  const escaneadoRef = useRef(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    escaneadoRef.current = false;
+    setErrorCamara(false);
+    if (!permission?.granted) {
+      requestPermission();
+    }
+    // Solo nos interesa reaccionar a que el modal se abra, no a cada
+    // cambio de "permission" (eso generaría un loop de pedidos).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  function handleBarcodeScanned(resultado: { data: string }) {
+    if (escaneadoRef.current) return;
+    escaneadoRef.current = true;
+    onScanned(resultado.data);
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onCancelar}
+    >
+      {/* Contenido solo montado mientras el modal está visible — así la
+          cámara no queda prendida de fondo cuando se cierra. */}
+      {visible && (
+        <View style={styles.escanerContainer}>
+          {errorCamara ? (
+            <View style={styles.escanerFallback}>
+              <Text style={styles.escanerFallbackText}>
+                No se pudo acceder a la cámara. Podés escribir el código a mano
+                en el formulario.
+              </Text>
+              <TouchableOpacity style={styles.escanerBoton} onPress={onCancelar}>
+                <Text style={styles.escanerBotonText}>Volver al formulario</Text>
+              </TouchableOpacity>
+            </View>
+          ) : !permission ? (
+            <ActivityIndicator color="#fff" style={{ flex: 1 }} />
+          ) : !permission.granted ? (
+            <View style={styles.escanerFallback}>
+              <Text style={styles.escanerFallbackText}>
+                {permission.canAskAgain
+                  ? 'Necesitamos tu permiso para usar la cámara y escanear el código.'
+                  : 'No tenés permiso de cámara habilitado. Podés otorgarlo desde los ajustes del celular, o seguir escribiendo el código a mano.'}
+              </Text>
+              {permission.canAskAgain && (
+                <TouchableOpacity style={styles.escanerBoton} onPress={requestPermission}>
+                  <Text style={styles.escanerBotonText}>Dar permiso</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={onCancelar} style={{ marginTop: 14 }}>
+                <Text style={styles.escanerLink}>Escribir el código a mano</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <CameraView
+                style={StyleSheet.absoluteFillObject}
+                facing="back"
+                barcodeScannerSettings={{ barcodeTypes: [...TIPOS_DE_CODIGO] }}
+                onBarcodeScanned={handleBarcodeScanned}
+                onMountError={() => setErrorCamara(true)}
+              />
+              <View style={styles.escanerOverlay} pointerEvents="none">
+                <View style={styles.escanerMarco} />
+                <Text style={styles.escanerAyuda}>
+                  Apuntá la cámara al código de barras del envase
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.escanerCancelar} onPress={onCancelar}>
+                <Text style={styles.escanerCancelarText}>✕ Cancelar</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      )}
+    </Modal>
+  );
+}
 
 export const AgregarLineaScreen = ({ navigation, route }: any) => {
   const { remitoId, cantidadCisternas } = route.params;
@@ -18,6 +126,17 @@ export const AgregarLineaScreen = ({ navigation, route }: any) => {
   const [codigoMuestraDiaria, setCodigoMuestraDiaria] = useState('');
   const [codigoMuestraUfc, setCodigoMuestraUfc] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Qué campo va a recibir el resultado del escaneo — null = modal cerrado.
+  const [escaneando, setEscaneando] = useState<'diaria' | 'ufc' | null>(null);
+
+  function handleCodigoEscaneado(codigo: string) {
+    if (escaneando === 'diaria') setCodigoMuestraDiaria(codigo);
+    else if (escaneando === 'ufc') setCodigoMuestraUfc(codigo);
+    // Escaneo exitoso: se cierra el modal y queda el formulario, ya con el
+    // campo completado.
+    setEscaneando(null);
+  }
 
   const { data: tambos, isLoading: loadingTambos } = useQuery({
     queryKey: ['tambos'],
@@ -142,20 +261,36 @@ export const AgregarLineaScreen = ({ navigation, route }: any) => {
       </View>
 
       <Text style={styles.label}>Código de Muestra Diaria (*)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Ej: MUEST-2026-001"
-        value={codigoMuestraDiaria}
-        onChangeText={setCodigoMuestraDiaria}
-      />
+      <View style={styles.filaConEscaner}>
+        <TextInput
+          style={[styles.input, styles.inputConEscaner]}
+          placeholder="Ej: MUEST-2026-001"
+          value={codigoMuestraDiaria}
+          onChangeText={setCodigoMuestraDiaria}
+        />
+        <TouchableOpacity
+          style={styles.botonEscanear}
+          onPress={() => setEscaneando('diaria')}
+        >
+          <Text style={styles.botonEscanearIcono}>📷</Text>
+        </TouchableOpacity>
+      </View>
 
       <Text style={styles.label}>Código de Muestra UFC</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Opcional"
-        value={codigoMuestraUfc}
-        onChangeText={setCodigoMuestraUfc}
-      />
+      <View style={styles.filaConEscaner}>
+        <TextInput
+          style={[styles.input, styles.inputConEscaner]}
+          placeholder="Opcional"
+          value={codigoMuestraUfc}
+          onChangeText={setCodigoMuestraUfc}
+        />
+        <TouchableOpacity
+          style={styles.botonEscanear}
+          onPress={() => setEscaneando('ufc')}
+        >
+          <Text style={styles.botonEscanearIcono}>📷</Text>
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity
         style={styles.submitButton}
@@ -170,6 +305,12 @@ export const AgregarLineaScreen = ({ navigation, route }: any) => {
           </Text>
         )}
       </TouchableOpacity>
+
+      <EscanerCodigoModal
+        visible={escaneando !== null}
+        onScanned={handleCodigoEscaneado}
+        onCancelar={() => setEscaneando(null)}
+      />
     </ScrollView>
   );
 };
@@ -192,6 +333,54 @@ const styles = StyleSheet.create({
   selectedOption: { backgroundColor: '#2b6cb0' },
   optionText: { color: '#2d3748', fontWeight: 'bold' },
   selectedOptionText: { color: '#ffffff' },
+  filaConEscaner: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
+  inputConEscaner: { flex: 1 },
+  botonEscanear: {
+    width: 48,
+    backgroundColor: '#2b6cb0',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  botonEscanearIcono: { fontSize: 20 },
   submitButton: { backgroundColor: '#38a169', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 20, marginBottom: 40 },
   submitButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+
+  // Modal de escaneo
+  escanerContainer: { flex: 1, backgroundColor: '#000' },
+  escanerFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  escanerFallbackText: { color: '#fff', fontSize: 15, textAlign: 'center', marginBottom: 20 },
+  escanerBoton: { backgroundColor: '#2b6cb0', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8 },
+  escanerBotonText: { color: '#fff', fontWeight: 'bold' },
+  escanerLink: { color: '#90cdf4', fontSize: 14, textDecorationLine: 'underline' },
+  escanerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  escanerMarco: {
+    width: '80%',
+    height: 140,
+    borderWidth: 3,
+    borderColor: '#38a169',
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+  },
+  escanerAyuda: {
+    color: '#fff',
+    fontSize: 14,
+    marginTop: 16,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
+  escanerCancelar: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  escanerCancelarText: { color: '#fff', fontWeight: 'bold' },
 });

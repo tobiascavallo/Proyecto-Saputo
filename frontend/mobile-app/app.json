@@ -27,7 +27,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Recolección Láctea necesita acceder a tu cámara para escanear el código de barras de la muestra.",
+          "recordAudioAndroid": false
+        }
+      ]
     ]
   }
 }
