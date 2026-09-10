@@ -2,13 +2,17 @@ import { useState } from "react";
 import Remitos from "./Remito";
 import ResultadosAnalisis from "./ResultadosAnalisis";
 import Navbar from "./Navbar";
-import { DatosReferenciaProvider } from "../contextos/DatosReferenciaContext";
+import { useSincronizacionSSE } from "../hooks/useSincronizacionSSE";
 
 function Empleado() {
   const [seccionActiva, setSeccionActiva] = useState("remitos");
 
+  // Única suscripción SSE del panel — el empleado no ve solicitudes de
+  // edición, así que no necesita los callbacks de toast.
+  useSincronizacionSSE();
+
   return (
-    <DatosReferenciaProvider>
+    <>
       <Navbar titulo="Panel Empleado" />
       <div className="container-fluid">
         <div className="row">
@@ -39,7 +43,7 @@ function Empleado() {
           </div>
         </div>
       </div>
-    </DatosReferenciaProvider>
+    </>
   );
 }
 

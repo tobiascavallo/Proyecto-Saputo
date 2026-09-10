@@ -1,6 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
-import { API_URL, fetchConToken } from "../api";
-import { useDatosReferencia } from "../contextos/DatosReferenciaContext";
+import { useState } from "react";
+import {
+  useTamberos,
+  useCrearTambero,
+  useActualizarTambero,
+  useActivarTambero,
+  useDesactivarTambero,
+} from "../hooks/useTamberos";
 
 const FORM_VACIO = {
   nombre: "",
@@ -10,12 +15,15 @@ const FORM_VACIO = {
 };
 
 function AltaTambero() {
-  const { invalidarTamberos } = useDatosReferencia();
-  const [vista, setVista] = useState<"listado" | "nuevo">("listado");
+  const tamberosQuery = useTamberos();
+  const tamberos = tamberosQuery.data ?? [];
 
-  const [tamberos, setTamberos] = useState<any[]>([]);
-  const [cargandoListado, setCargandoListado] = useState(true);
-  const [errorListado, setErrorListado] = useState("");
+  const crearTambero = useCrearTambero();
+  const actualizarTambero = useActualizarTambero();
+  const activarTambero = useActivarTambero();
+  const desactivarTambero = useDesactivarTambero();
+
+  const [vista, setVista] = useState<"listado" | "nuevo">("listado");
   const [filtroEstado, setFiltroEstado] = useState<
     "activos" | "inactivos" | "todos"
   >("activos");
@@ -25,27 +33,7 @@ function AltaTambero() {
 
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
-
-  const fetchTamberos = useCallback(async () => {
-    setCargandoListado(true);
-    try {
-      const response = await fetchConToken(`${API_URL}/api/v1/tambero`);
-      if (!response.ok) {
-        setErrorListado("Error al obtener los tamberos");
-        return;
-      }
-      const data = await response.json();
-      setTamberos(data || []);
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    } finally {
-      setCargandoListado(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTamberos();
-  }, [fetchTamberos]);
+  const [errorAccion, setErrorAccion] = useState("");
 
   const tamberosFiltrados = tamberos.filter((t: any) => {
     if (filtroEstado === "activos") return t.activo;
@@ -72,101 +60,50 @@ function AltaTambero() {
     setVista("listado");
   }
 
-  async function handleSubmit() {
-    try {
-      const url = editandoId
-        ? `${API_URL}/api/v1/tambero/${editandoId}`
-        : `${API_URL}/api/v1/tambero`;
-
-      const response = await fetchConToken(url, {
-        method: editandoId ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        setError(
-          data.error ||
-            (editandoId
-              ? "Error al actualizar el tambero"
-              : "Error al crear el tambero"),
+  function handleSubmit() {
+    setError("");
+    const alTerminar = {
+      onSuccess: () => {
+        setExito(
+          editandoId
+            ? "Tambero actualizado correctamente"
+            : "Tambero creado correctamente",
         );
-        return;
-      }
+        setEditandoId(null);
+        setForm(FORM_VACIO);
+        setVista("listado");
+      },
+      onError: (e: Error) => setError(e.message),
+    };
 
-      setExito(
-        editandoId
-          ? "Tambero actualizado correctamente"
-          : "Tambero creado correctamente",
-      );
-      setEditandoId(null);
-      setForm(FORM_VACIO);
-      fetchTamberos();
-
-      // Solo en el alta: el <select> de AltaTambo.tsx lee el listado de
-      // tamberos del contexto compartido, no de este fetch local.
-      if (!editandoId) {
-        invalidarTamberos();
-      }
-
-      setVista("listado");
-    } catch (error) {
-      setError("Error al conectar con el servidor");
+    if (editandoId) {
+      actualizarTambero.mutate({ id: editandoId, body: form }, alTerminar);
+    } else {
+      crearTambero.mutate(form, alTerminar);
     }
   }
 
-  async function handleDesactivar(tambero: any) {
+  function handleDesactivar(tambero: any) {
     if (!window.confirm(`¿Desactivar a ${tambero.nombre}?`)) {
       return;
     }
-
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/tambero/${tambero.id}`,
-        { method: "DELETE" },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorListado(data.error || "Error al desactivar el tambero");
-        return;
-      }
-
-      setTamberos((actuales) =>
-        actuales.map((t) =>
-          t.id === tambero.id ? { ...t, activo: false } : t,
-        ),
-      );
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    }
+    setErrorAccion("");
+    desactivarTambero.mutate(tambero.id, {
+      onError: (e: Error) => setErrorAccion(e.message),
+    });
   }
 
-  async function handleActivar(tambero: any) {
+  function handleActivar(tambero: any) {
     if (!window.confirm(`¿Reactivar a ${tambero.nombre}?`)) {
       return;
     }
-
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/tambero/${tambero.id}/activar`,
-        { method: "PATCH" },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorListado(data.error || "Error al reactivar el tambero");
-        return;
-      }
-
-      setTamberos((actuales) =>
-        actuales.map((t) => (t.id === tambero.id ? { ...t, activo: true } : t)),
-      );
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    }
+    setErrorAccion("");
+    activarTambero.mutate(tambero.id, {
+      onError: (e: Error) => setErrorAccion(e.message),
+    });
   }
+
+  const guardando = crearTambero.isPending || actualizarTambero.isPending;
 
   return (
     <div className="container-fluid mt-4">
@@ -221,10 +158,12 @@ function AltaTambero() {
             </button>
           </div>
 
-          {cargandoListado ? (
+          {errorAccion && <p className="text-danger">{errorAccion}</p>}
+
+          {tamberosQuery.isPending ? (
             <p>Cargando tamberos...</p>
-          ) : errorListado ? (
-            <p className="text-danger">{errorListado}</p>
+          ) : tamberosQuery.isError ? (
+            <p className="text-danger">Error al obtener los tamberos.</p>
           ) : tamberosFiltrados.length === 0 ? (
             <p className="text-muted">No hay tamberos para mostrar.</p>
           ) : (
@@ -321,6 +260,7 @@ function AltaTambero() {
             <div className="d-flex gap-2">
               <button
                 onClick={handleSubmit}
+                disabled={guardando}
                 className="btn btn-primary flex-grow-1"
               >
                 {editandoId ? "Guardar cambios" : "Crear tambero"}

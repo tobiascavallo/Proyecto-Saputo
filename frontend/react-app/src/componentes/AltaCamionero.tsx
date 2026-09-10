@@ -1,10 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
-import { API_URL, fetchConToken } from "../api";
-import { useDatosReferencia } from "../contextos/DatosReferenciaContext";
+import { useState } from "react";
 import Remitos from "./Remito";
+import { useUsuarios } from "../hooks/useUsuarios";
+import { useEmpresas } from "../hooks/useEmpresas";
+import {
+  useCamioneros,
+  useCrearCamionero,
+  useActualizarCamionero,
+  useActivarCamionero,
+  useDesactivarCamionero,
+} from "../hooks/useCamioneros";
 
 function AltaCamionero() {
-  const { invalidarCamionero } = useDatosReferencia();
   const [vista, setVista] = useState<"listado" | "nuevo">("listado");
 
   // Cuando está seteado, se reemplaza toda la vista de Camioneros por los
@@ -14,68 +20,29 @@ function AltaCamionero() {
     nombre: string;
   } | null>(null);
 
-  const [camioneros, setCamioneros] = useState<any[]>([]);
-  const [usuarios, setUsuarios] = useState<any[]>([]);
-  const [empresas, setEmpresas] = useState<any[]>([]);
-  const [cargandoListado, setCargandoListado] = useState(true);
-  const [errorListado, setErrorListado] = useState("");
+  const camionerosQuery = useCamioneros();
+  const camioneros = camionerosQuery.data ?? [];
+  const { data: usuarios = [] } = useUsuarios();
+  const { data: empresas = [] } = useEmpresas();
+
+  const crearCamionero = useCrearCamionero();
+  const actualizarCamionero = useActualizarCamionero();
+  const activarCamionero = useActivarCamionero();
+  const desactivarCamionero = useDesactivarCamionero();
+
   const [filtroEstado, setFiltroEstado] = useState<
     "activos" | "inactivos" | "todos"
   >("activos");
 
   // En alta, se elige el usuario de un <select>. En edición, el usuario
-  // queda fijo (solo se muestra su nombre) — lo único editable es la
-  // empresa transportista.
+  // queda fijo (solo se muestra su nombre) — lo único editable es la empresa.
   const [editandoId, setEditandoId] = useState<string | null>(null);
-  const [editandoUsuarioId, setEditandoUsuarioId] = useState("");
   const [editandoUsuarioNombre, setEditandoUsuarioNombre] = useState("");
   const [usuarioId, setUsuarioId] = useState("");
   const [empresaId, setEmpresaId] = useState("");
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
-
-  const fetchCamioneros = useCallback(async () => {
-    setCargandoListado(true);
-    try {
-      const response = await fetchConToken(`${API_URL}/api/v1/camionero`);
-      if (!response.ok) {
-        setErrorListado("Error al obtener los camioneros");
-        return;
-      }
-      const data = await response.json();
-      setCamioneros(data || []);
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    } finally {
-      setCargandoListado(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchCamioneros();
-  }, [fetchCamioneros]);
-
-  // Traemos usuarios y empresas para armar los <select> del formulario
-  // "Nuevo" — el listado de usuarios con rol camionero que todavía no
-  // tienen datos cargados sale de cruzar ambas listas (ver usuariosSinDatos).
-  useEffect(() => {
-    async function fetchDatosReferencia() {
-      try {
-        const [responseUsuarios, responseEmpresas] = await Promise.all([
-          fetchConToken(`${API_URL}/api/v1/usuario`),
-          fetchConToken(`${API_URL}/api/v1/empresaTransportista`),
-        ]);
-        const dataUsuarios = await responseUsuarios.json();
-        const dataEmpresas = await responseEmpresas.json();
-        setUsuarios(dataUsuarios || []);
-        setEmpresas(dataEmpresas || []);
-      } catch (error) {
-        setError("Error al cargar usuarios y empresas transportistas");
-      }
-    }
-
-    fetchDatosReferencia();
-  }, []);
+  const [errorAccion, setErrorAccion] = useState("");
 
   const camionerosFiltrados = camioneros.filter((c: any) => {
     if (filtroEstado === "activos") return c.activo;
@@ -92,7 +59,6 @@ function AltaCamionero() {
 
   function iniciarEdicion(camionero: any) {
     setEditandoId(camionero.id);
-    setEditandoUsuarioId(camionero.usuario_id);
     setEditandoUsuarioNombre(camionero.usuario_nombre);
     setEmpresaId(camionero.empresa_transportista_id);
     setError("");
@@ -102,14 +68,13 @@ function AltaCamionero() {
 
   function cancelarEdicion() {
     setEditandoId(null);
-    setEditandoUsuarioId("");
     setEditandoUsuarioNombre("");
     setUsuarioId("");
     setEmpresaId("");
     setVista("listado");
   }
 
-  async function handleSubmit() {
+  function handleSubmit() {
     if (!editandoId && !usuarioId) {
       setError("Seleccioná un camionero");
       return;
@@ -118,52 +83,38 @@ function AltaCamionero() {
       setError("Seleccioná una empresa transportista");
       return;
     }
+    setError("");
 
-    try {
-      const url = editandoId
-        ? `${API_URL}/api/v1/camionero/${editandoId}`
-        : `${API_URL}/api/v1/camionero`;
-
-      const body = editandoId
-        ? { empresa_transportista_id: empresaId }
-        : { usuario_id: usuarioId, empresa_transportista_id: empresaId };
-
-      const response = await fetchConToken(url, {
-        method: editandoId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        setError(
-          data.error ||
-            (editandoId
-              ? "Error al actualizar los datos del camionero"
-              : "Error al crear los datos del camionero"),
+    const alTerminar = {
+      onSuccess: () => {
+        setExito(
+          editandoId
+            ? "Datos del camionero actualizados correctamente"
+            : "Datos del camionero guardados correctamente",
         );
-        return;
-      }
+        setEditandoId(null);
+        setEditandoUsuarioNombre("");
+        setUsuarioId("");
+        setEmpresaId("");
+        setVista("listado");
+      },
+      onError: (e: Error) => setError(e.message),
+    };
 
-      invalidarCamionero(editandoId ? editandoUsuarioId : usuarioId);
-      setExito(
-        editandoId
-          ? "Datos del camionero actualizados correctamente"
-          : "Datos del camionero guardados correctamente",
+    if (editandoId) {
+      actualizarCamionero.mutate(
+        { id: editandoId, body: { empresa_transportista_id: empresaId } },
+        alTerminar,
       );
-      setEditandoId(null);
-      setEditandoUsuarioId("");
-      setEditandoUsuarioNombre("");
-      setUsuarioId("");
-      setEmpresaId("");
-      fetchCamioneros();
-      setVista("listado");
-    } catch (error) {
-      setError("Error al conectar con el servidor");
+    } else {
+      crearCamionero.mutate(
+        { usuario_id: usuarioId, empresa_transportista_id: empresaId },
+        alTerminar,
+      );
     }
   }
 
-  async function handleDesactivar(camionero: any) {
+  function handleDesactivar(camionero: any) {
     if (
       !window.confirm(
         `¿Desactivar los datos de camionero de ${camionero.usuario_nombre}?`,
@@ -171,31 +122,13 @@ function AltaCamionero() {
     ) {
       return;
     }
-
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/camionero/${camionero.id}`,
-        { method: "DELETE" },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorListado(data.error || "Error al desactivar el camionero");
-        return;
-      }
-
-      invalidarCamionero(camionero.usuario_id);
-      setCamioneros((actuales) =>
-        actuales.map((c) =>
-          c.id === camionero.id ? { ...c, activo: false } : c,
-        ),
-      );
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    }
+    setErrorAccion("");
+    desactivarCamionero.mutate(camionero.id, {
+      onError: (e: Error) => setErrorAccion(e.message),
+    });
   }
 
-  async function handleActivar(camionero: any) {
+  function handleActivar(camionero: any) {
     if (
       !window.confirm(
         `¿Reactivar los datos de camionero de ${camionero.usuario_nombre}?`,
@@ -203,29 +136,13 @@ function AltaCamionero() {
     ) {
       return;
     }
-
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/camionero/${camionero.id}/activar`,
-        { method: "PATCH" },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorListado(data.error || "Error al reactivar el camionero");
-        return;
-      }
-
-      invalidarCamionero(camionero.usuario_id);
-      setCamioneros((actuales) =>
-        actuales.map((c) =>
-          c.id === camionero.id ? { ...c, activo: true } : c,
-        ),
-      );
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    }
+    setErrorAccion("");
+    activarCamionero.mutate(camionero.id, {
+      onError: (e: Error) => setErrorAccion(e.message),
+    });
   }
+
+  const guardando = crearCamionero.isPending || actualizarCamionero.isPending;
 
   if (camioneroSeleccionado) {
     return (
@@ -292,10 +209,12 @@ function AltaCamionero() {
             </button>
           </div>
 
-          {cargandoListado ? (
+          {errorAccion && <p className="text-danger">{errorAccion}</p>}
+
+          {camionerosQuery.isPending ? (
             <p>Cargando camioneros...</p>
-          ) : errorListado ? (
-            <p className="text-danger">{errorListado}</p>
+          ) : camionerosQuery.isError ? (
+            <p className="text-danger">Error al obtener los camioneros.</p>
           ) : camionerosFiltrados.length === 0 ? (
             <p className="text-muted">No hay camioneros para mostrar.</p>
           ) : (
@@ -418,6 +337,7 @@ function AltaCamionero() {
                 <div className="d-flex gap-2">
                   <button
                     onClick={handleSubmit}
+                    disabled={guardando}
                     className="btn btn-primary flex-grow-1"
                   >
                     {editandoId ? "Guardar cambios" : "Guardar datos del camionero"}

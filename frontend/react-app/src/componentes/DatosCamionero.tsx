@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
-import { API_URL, fetchConToken } from "../api";
-import { useDatosReferencia } from "../contextos/DatosReferenciaContext";
+import { useState } from "react";
+import { useUsuarios } from "../hooks/useUsuarios";
+import { useEmpresas } from "../hooks/useEmpresas";
+import { useCrearCamionero } from "../hooks/useCamioneros";
 
 // DatosCamionero.tsx - Segundo paso del alta de un camionero: el usuario
 // (login, rol) ya existe, acá se completa el dato específico del rol
@@ -16,67 +17,35 @@ function DatosCamionero({
   onGuardado: () => void;
   onCancelar: () => void;
 }) {
-  const { invalidarCamionero } = useDatosReferencia();
-  const [nombreUsuario, setNombreUsuario] = useState("");
-  const [empresas, setEmpresas] = useState<any[]>([]);
+  // El usuario recién se creó en AltaUsuario, que invalidó ["usuarios"] — el
+  // listado ya cacheado lo contiene (o lo va a contener apenas termine el
+  // refetch; hasta entonces se muestra el texto genérico).
+  const { data: usuarios = [] } = useUsuarios();
+  const { data: empresas = [] } = useEmpresas();
+  const crearCamionero = useCrearCamionero();
+
+  const usuario = usuarios.find((u: any) => u.id === usuarioId);
+  const nombreUsuario = usuario
+    ? `${usuario.nombre} ${usuario.apellido}`
+    : "";
+
   const [empresaId, setEmpresaId] = useState("");
   const [error, setError] = useState("");
-  const [guardando, setGuardando] = useState(false);
 
-  useEffect(() => {
-    async function fetchDatos() {
-      try {
-        const [responseUsuario, responseEmpresas] = await Promise.all([
-          fetchConToken(`${API_URL}/api/v1/usuario/${usuarioId}`),
-          fetchConToken(`${API_URL}/api/v1/empresaTransportista`),
-        ]);
-
-        if (responseUsuario.ok) {
-          const usuario = await responseUsuario.json();
-          setNombreUsuario(`${usuario.nombre} ${usuario.apellido}`);
-        }
-
-        const dataEmpresas = await responseEmpresas.json();
-        setEmpresas(dataEmpresas || []);
-      } catch (error) {
-        setError("Error al cargar los datos necesarios");
-      }
-    }
-
-    fetchDatos();
-  }, [usuarioId]);
-
-  async function handleGuardar() {
+  function handleGuardar() {
     if (!empresaId) {
       setError("Seleccioná una empresa transportista");
       return;
     }
-
-    setGuardando(true);
     setError("");
-    try {
-      const response = await fetchConToken(`${API_URL}/api/v1/camionero`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          usuario_id: usuarioId,
-          empresa_transportista_id: empresaId,
-        }),
-      });
 
-      if (!response.ok) {
-        const data = await response.json();
-        setError(data.error || "Error al guardar los datos del camionero");
-        return;
-      }
-
-      invalidarCamionero(usuarioId);
-      onGuardado();
-    } catch (error) {
-      setError("Error al conectar con el servidor");
-    } finally {
-      setGuardando(false);
-    }
+    crearCamionero.mutate(
+      { usuario_id: usuarioId, empresa_transportista_id: empresaId },
+      {
+        onSuccess: () => onGuardado(),
+        onError: (e: Error) => setError(e.message),
+      },
+    );
   }
 
   return (
@@ -106,7 +75,7 @@ function DatosCamionero({
           <button
             className="btn btn-primary flex-grow-1"
             onClick={handleGuardar}
-            disabled={guardando}
+            disabled={crearCamionero.isPending}
           >
             Guardar datos del camionero
           </button>

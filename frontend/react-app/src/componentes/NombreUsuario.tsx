@@ -1,48 +1,27 @@
 import { useState } from "react";
-import {
-  useDatosReferencia,
-  type UsuarioBasico,
-  type CamioneroBasico,
-} from "../contextos/DatosReferenciaContext";
+import { useNombreUsuario, useUsuarioBasico } from "../hooks/useUsuarios";
+import { useCamioneroPorUsuario } from "../hooks/useCamioneros";
 
 // NombreUsuario.tsx - Muestra el nombre de un usuario (típicamente un
 // camionero) a partir de su ID, con un botón "Ver detalle" que trae el resto
 // de sus datos (DNI, teléfono, empresa transportista) bajo demanda.
 //
-// El nombre sale directo del contexto cuando el rol logueado tiene acceso al
-// listado completo de usuarios (encargado); si no (empleado), se muestra
-// "Camionero" en su lugar. En ambos casos el botón funciona igual: pide el
-// detalle puntual a GET /api/v1/usuario/:id/basico y GET
-// /api/v1/camionero/usuario/:id, cacheado en el contexto.
+// El nombre sale del listado cacheado de usuarios cuando el rol logueado
+// tiene acceso (encargado); si no (empleado), se muestra "Camionero". El
+// detalle se pide recién al abrir el modal (queries con `enabled`), y
+// TanStack Query lo cachea por ID: reabrir el mismo modal es instantáneo.
 function NombreUsuario({ id }: { id: string }) {
-  const { nombreUsuario, obtenerUsuarioBasico, obtenerCamioneroPorUsuario } =
-    useDatosReferencia();
-  const [detalle, setDetalle] = useState<UsuarioBasico | null>(null);
-  const [camionero, setCamionero] = useState<CamioneroBasico | null>(null);
-  const [cargandoDetalle, setCargandoDetalle] = useState(false);
-  const [errorDetalle, setErrorDetalle] = useState(false);
   const [mostrarDetalle, setMostrarDetalle] = useState(false);
 
-  const nombreResuelto = nombreUsuario(id);
+  const nombreResuelto = useNombreUsuario(id);
+  const usuarioQuery = useUsuarioBasico(id, mostrarDetalle);
+  const camioneroQuery = useCamioneroPorUsuario(id, mostrarDetalle);
 
-  async function abrirDetalle() {
-    setMostrarDetalle(true);
-    if (detalle) return; // ya se pidió antes, se reusa
-
-    setCargandoDetalle(true);
-    setErrorDetalle(false);
-    const [datosUsuario, datosCamionero] = await Promise.all([
-      obtenerUsuarioBasico(id),
-      obtenerCamioneroPorUsuario(id),
-    ]);
-    if (datosUsuario) {
-      setDetalle(datosUsuario);
-      setCamionero(datosCamionero);
-    } else {
-      setErrorDetalle(true);
-    }
-    setCargandoDetalle(false);
-  }
+  const detalle = usuarioQuery.data;
+  const camionero = camioneroQuery.data;
+  const cargandoDetalle = usuarioQuery.isLoading || camioneroQuery.isLoading;
+  // El dato que importa es el básico del usuario; si ese falla, es error.
+  const errorDetalle = usuarioQuery.isError;
 
   return (
     <>
@@ -50,7 +29,7 @@ function NombreUsuario({ id }: { id: string }) {
       <button
         type="button"
         className="btn btn-sm btn-outline-secondary"
-        onClick={abrirDetalle}
+        onClick={() => setMostrarDetalle(true)}
       >
         Ver detalle
       </button>

@@ -1,63 +1,25 @@
-import { useState, useEffect, useCallback } from "react";
-import { jwtDecode } from "jwt-decode";
-import { API_URL, fetchConToken } from "../api";
-import { useEventosSSE } from "../sse";
-
-function rolLogueado(): string | null {
-  const token = localStorage.getItem("token");
-  if (!token) return null;
-  try {
-    return (jwtDecode(token) as any).rol ?? null;
-  } catch {
-    return null;
-  }
-}
+import { useState } from "react";
+import { rolActual } from "../api";
+import { useResultados, useActualizarResultado } from "../hooks/useResultados";
 
 function ResultadosAnalisis() {
-  const [resultados, setResultados] = useState<any[]>([]);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState("");
-  const esEncargado = rolLogueado() === "encargado";
+  const resultadosQuery = useResultados();
+  const resultados = resultadosQuery.data ?? [];
+  const actualizarResultado = useActualizarResultado();
+
+  const esEncargado = rolActual() === "encargado";
 
   const [editando, setEditando] = useState<any>(null);
   const [formResultado, setFormResultado] = useState("pendiente");
   const [formObservaciones, setFormObservaciones] = useState("");
-  const [guardando, setGuardando] = useState(false);
   const [errorEdicion, setErrorEdicion] = useState("");
 
-  const fetchResultados = useCallback(async () => {
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/resultadoAnalisis`,
-      );
+  // El refresco en tiempo real (resultado_cargado / resultado_actualizado)
+  // lo maneja useSincronizacionSSE a nivel panel.
 
-      if (!response.ok) {
-        setError("Error al obtener los resultados");
-        return;
-      }
-
-      const data = await response.json();
-      setResultados(data || []);
-    } catch (error) {
-      setError("Error al conectar con el servidor");
-    } finally {
-      setCargando(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchResultados();
-  }, [fetchResultados]);
-
-  // Tiempo real: un resultado cargado o corregido en otra sesión refresca
-  // la lista automáticamente.
-  useEventosSSE({
-    resultado_cargado: fetchResultados,
-    resultado_actualizado: fetchResultados,
-  });
-
-  if (cargando) return <p className="p-4">Cargando...</p>;
-  if (error) return <p className="p-4 text-danger">{error}</p>;
+  if (resultadosQuery.isPending) return <p className="p-4">Cargando...</p>;
+  if (resultadosQuery.isError)
+    return <p className="p-4 text-danger">Error al obtener los resultados</p>;
 
   function badgeResultado(resultado: string) {
     if (resultado === "apta")
@@ -78,46 +40,24 @@ function ResultadosAnalisis() {
     setEditando(null);
   }
 
-  async function guardarEdicion() {
+  function guardarEdicion() {
     if (!editando) return;
 
-    setGuardando(true);
     setErrorEdicion("");
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/resultadoAnalisis/${editando.id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            resultado: formResultado,
-            observaciones: formObservaciones,
-          }),
+    actualizarResultado.mutate(
+      {
+        id: editando.id,
+        body: {
+          resultado: formResultado,
+          observaciones: formObservaciones,
         },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorEdicion(data.error || "Error al actualizar el resultado");
-        return;
-      }
-
-      // Actualizamos solo la fila editada en el estado local — no hace
-      // falta volver a pedir toda la lista (mismo criterio que
-      // SolicitudesEdicion.tsx en tomarDecision).
-      setResultados((actuales) =>
-        actuales.map((r) =>
-          r.id === editando.id
-            ? { ...r, resultado: formResultado, observaciones: formObservaciones }
-            : r,
-        ),
-      );
-      setEditando(null);
-    } catch (error) {
-      setErrorEdicion("Error al conectar con el servidor");
-    } finally {
-      setGuardando(false);
-    }
+      },
+      {
+        onSuccess: () => setEditando(null),
+        onError: (e: Error) =>
+          setErrorEdicion(e.message || "Error al actualizar el resultado"),
+      },
+    );
   }
 
   return (
@@ -212,7 +152,7 @@ function ResultadosAnalisis() {
                   type="button"
                   className="btn btn-primary btn-sm"
                   onClick={guardarEdicion}
-                  disabled={guardando}
+                  disabled={actualizarResultado.isPending}
                 >
                   Guardar
                 </button>

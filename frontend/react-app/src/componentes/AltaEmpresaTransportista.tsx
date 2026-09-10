@@ -1,6 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
-import { API_URL, fetchConToken } from "../api";
-import { useDatosReferencia } from "../contextos/DatosReferenciaContext";
+import { useState } from "react";
+import {
+  useEmpresas,
+  useCrearEmpresa,
+  useActualizarEmpresa,
+  useActivarEmpresa,
+  useDesactivarEmpresa,
+} from "../hooks/useEmpresas";
 
 const FORM_VACIO = {
   nombre: "",
@@ -9,12 +14,15 @@ const FORM_VACIO = {
 };
 
 function AltaEmpresaTransportista() {
-  const { invalidarEmpresas } = useDatosReferencia();
-  const [vista, setVista] = useState<"listado" | "nuevo">("listado");
+  const empresasQuery = useEmpresas();
+  const empresas = empresasQuery.data ?? [];
 
-  const [empresas, setEmpresas] = useState<any[]>([]);
-  const [cargandoListado, setCargandoListado] = useState(true);
-  const [errorListado, setErrorListado] = useState("");
+  const crearEmpresa = useCrearEmpresa();
+  const actualizarEmpresa = useActualizarEmpresa();
+  const activarEmpresa = useActivarEmpresa();
+  const desactivarEmpresa = useDesactivarEmpresa();
+
+  const [vista, setVista] = useState<"listado" | "nuevo">("listado");
   const [filtroEstado, setFiltroEstado] = useState<
     "activos" | "inactivos" | "todos"
   >("activos");
@@ -24,29 +32,7 @@ function AltaEmpresaTransportista() {
 
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
-
-  const fetchEmpresas = useCallback(async () => {
-    setCargandoListado(true);
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/empresaTransportista`,
-      );
-      if (!response.ok) {
-        setErrorListado("Error al obtener las empresas transportistas");
-        return;
-      }
-      const data = await response.json();
-      setEmpresas(data || []);
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    } finally {
-      setCargandoListado(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchEmpresas();
-  }, [fetchEmpresas]);
+  const [errorAccion, setErrorAccion] = useState("");
 
   const empresasFiltradas = empresas.filter((e: any) => {
     if (filtroEstado === "activos") return e.activo;
@@ -72,101 +58,50 @@ function AltaEmpresaTransportista() {
     setVista("listado");
   }
 
-  async function handleSubmit() {
-    try {
-      const url = editandoId
-        ? `${API_URL}/api/v1/empresaTransportista/${editandoId}`
-        : `${API_URL}/api/v1/empresaTransportista`;
-
-      const response = await fetchConToken(url, {
-        method: editandoId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        setError(
-          data.error ||
-            (editandoId
-              ? "Error al actualizar la empresa transportista"
-              : "Error al crear la empresa transportista"),
+  function handleSubmit() {
+    setError("");
+    const alTerminar = {
+      onSuccess: () => {
+        setExito(
+          editandoId
+            ? "Empresa transportista actualizada correctamente"
+            : "Empresa transportista creada correctamente",
         );
-        return;
-      }
+        setEditandoId(null);
+        setForm(FORM_VACIO);
+        setVista("listado");
+      },
+      onError: (e: Error) => setError(e.message),
+    };
 
-      setExito(
-        editandoId
-          ? "Empresa transportista actualizada correctamente"
-          : "Empresa transportista creada correctamente",
-      );
-      setEditandoId(null);
-      setForm(FORM_VACIO);
-      fetchEmpresas();
-
-      // Solo en el alta: los <select> de AltaVehiculo.tsx/AltaAcoplado.tsx
-      // leen el listado de empresas del contexto compartido, no de acá.
-      if (!editandoId) {
-        invalidarEmpresas();
-      }
-
-      setVista("listado");
-    } catch (error) {
-      setError("Error al conectar con el servidor");
+    if (editandoId) {
+      actualizarEmpresa.mutate({ id: editandoId, body: form }, alTerminar);
+    } else {
+      crearEmpresa.mutate(form, alTerminar);
     }
   }
 
-  async function handleDesactivar(empresa: any) {
+  function handleDesactivar(empresa: any) {
     if (!window.confirm(`¿Desactivar la empresa "${empresa.nombre}"?`)) {
       return;
     }
-
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/empresaTransportista/${empresa.id}`,
-        { method: "DELETE" },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorListado(data.error || "Error al desactivar la empresa");
-        return;
-      }
-
-      setEmpresas((actuales) =>
-        actuales.map((e) =>
-          e.id === empresa.id ? { ...e, activo: false } : e,
-        ),
-      );
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    }
+    setErrorAccion("");
+    desactivarEmpresa.mutate(empresa.id, {
+      onError: (e: Error) => setErrorAccion(e.message),
+    });
   }
 
-  async function handleActivar(empresa: any) {
+  function handleActivar(empresa: any) {
     if (!window.confirm(`¿Reactivar la empresa "${empresa.nombre}"?`)) {
       return;
     }
-
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/empresaTransportista/${empresa.id}/activar`,
-        { method: "PATCH" },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorListado(data.error || "Error al reactivar la empresa");
-        return;
-      }
-
-      setEmpresas((actuales) =>
-        actuales.map((e) => (e.id === empresa.id ? { ...e, activo: true } : e)),
-      );
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    }
+    setErrorAccion("");
+    activarEmpresa.mutate(empresa.id, {
+      onError: (e: Error) => setErrorAccion(e.message),
+    });
   }
+
+  const guardando = crearEmpresa.isPending || actualizarEmpresa.isPending;
 
   return (
     <div className="container-fluid mt-4">
@@ -221,10 +156,14 @@ function AltaEmpresaTransportista() {
             </button>
           </div>
 
-          {cargandoListado ? (
+          {errorAccion && <p className="text-danger">{errorAccion}</p>}
+
+          {empresasQuery.isPending ? (
             <p>Cargando empresas transportistas...</p>
-          ) : errorListado ? (
-            <p className="text-danger">{errorListado}</p>
+          ) : empresasQuery.isError ? (
+            <p className="text-danger">
+              Error al obtener las empresas transportistas.
+            </p>
           ) : empresasFiltradas.length === 0 ? (
             <p className="text-muted">No hay empresas para mostrar.</p>
           ) : (
@@ -312,6 +251,7 @@ function AltaEmpresaTransportista() {
             <div className="d-flex gap-2">
               <button
                 onClick={handleSubmit}
+                disabled={guardando}
                 className="btn btn-primary flex-grow-1"
               >
                 {editandoId ? "Guardar cambios" : "Crear empresa transportista"}

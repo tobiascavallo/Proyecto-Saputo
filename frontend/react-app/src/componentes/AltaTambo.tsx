@@ -1,6 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
-import { API_URL, fetchConToken } from "../api";
-import { useDatosReferencia } from "../contextos/DatosReferenciaContext";
+import { useState } from "react";
+import { useTamberos } from "../hooks/useTamberos";
+import {
+  useTambos,
+  useCrearTambo,
+  useActualizarTambo,
+  useActivarTambo,
+  useDesactivarTambo,
+} from "../hooks/useTambos";
 
 const FORM_VACIO = {
   numero_tambo: "",
@@ -8,12 +14,16 @@ const FORM_VACIO = {
 };
 
 function AltaTambo() {
-  const { tamberos, invalidarTambos } = useDatosReferencia();
-  const [vista, setVista] = useState<"listado" | "nuevo">("listado");
+  const { data: tamberos = [] } = useTamberos();
+  const tambosQuery = useTambos();
+  const tambos = tambosQuery.data ?? [];
 
-  const [tambos, setTambos] = useState<any[]>([]);
-  const [cargandoListado, setCargandoListado] = useState(true);
-  const [errorListado, setErrorListado] = useState("");
+  const crearTambo = useCrearTambo();
+  const actualizarTambo = useActualizarTambo();
+  const activarTambo = useActivarTambo();
+  const desactivarTambo = useDesactivarTambo();
+
+  const [vista, setVista] = useState<"listado" | "nuevo">("listado");
   const [filtroEstado, setFiltroEstado] = useState<
     "activos" | "inactivos" | "todos"
   >("activos");
@@ -23,27 +33,7 @@ function AltaTambo() {
 
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
-
-  const fetchTambos = useCallback(async () => {
-    setCargandoListado(true);
-    try {
-      const response = await fetchConToken(`${API_URL}/api/v1/tambo`);
-      if (!response.ok) {
-        setErrorListado("Error al obtener los tambos");
-        return;
-      }
-      const data = await response.json();
-      setTambos(data || []);
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    } finally {
-      setCargandoListado(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTambos();
-  }, [fetchTambos]);
+  const [errorAccion, setErrorAccion] = useState("");
 
   const tambosFiltrados = tambos.filter((t: any) => {
     if (filtroEstado === "activos") return t.activo;
@@ -68,102 +58,54 @@ function AltaTambo() {
     setVista("listado");
   }
 
-  async function handleSubmit() {
-    try {
-      const url = editandoId
-        ? `${API_URL}/api/v1/tambo/${editandoId}`
-        : `${API_URL}/api/v1/tambo`;
-
-      const response = await fetchConToken(url, {
-        method: editandoId ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          numero_tambo: Number(form.numero_tambo),
-          tambero_id: form.tambero_id,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        setError(
-          data.error ||
-            (editandoId
-              ? "Error al actualizar el tambo"
-              : "Error al crear el tambo"),
+  function handleSubmit() {
+    setError("");
+    const body = {
+      numero_tambo: Number(form.numero_tambo),
+      tambero_id: form.tambero_id,
+    };
+    const alTerminar = {
+      onSuccess: () => {
+        setExito(
+          editandoId
+            ? "Tambo actualizado correctamente"
+            : "Tambo creado correctamente",
         );
-        return;
-      }
+        setEditandoId(null);
+        setForm(FORM_VACIO);
+        setVista("listado");
+      },
+      onError: (e: Error) => setError(e.message),
+    };
 
-      setExito(
-        editandoId
-          ? "Tambo actualizado correctamente"
-          : "Tambo creado correctamente",
-      );
-      setEditandoId(null);
-      setForm(FORM_VACIO);
-      fetchTambos();
-
-      // Solo en el alta: nombreTambo() en Remito.tsx lee el listado de
-      // tambos del contexto compartido, no de este fetch local.
-      if (!editandoId) {
-        invalidarTambos();
-      }
-
-      setVista("listado");
-    } catch (error) {
-      setError("Error al conectar con el servidor");
+    if (editandoId) {
+      actualizarTambo.mutate({ id: editandoId, body }, alTerminar);
+    } else {
+      crearTambo.mutate(body, alTerminar);
     }
   }
 
-  async function handleDesactivar(tambo: any) {
+  function handleDesactivar(tambo: any) {
     if (!window.confirm(`¿Desactivar el tambo N° ${tambo.numero_tambo}?`)) {
       return;
     }
-
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/tambo/${tambo.id}`,
-        { method: "DELETE" },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorListado(data.error || "Error al desactivar el tambo");
-        return;
-      }
-
-      setTambos((actuales) =>
-        actuales.map((t) => (t.id === tambo.id ? { ...t, activo: false } : t)),
-      );
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    }
+    setErrorAccion("");
+    desactivarTambo.mutate(tambo.id, {
+      onError: (e: Error) => setErrorAccion(e.message),
+    });
   }
 
-  async function handleActivar(tambo: any) {
+  function handleActivar(tambo: any) {
     if (!window.confirm(`¿Reactivar el tambo N° ${tambo.numero_tambo}?`)) {
       return;
     }
-
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/tambo/${tambo.id}/activar`,
-        { method: "PATCH" },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorListado(data.error || "Error al reactivar el tambo");
-        return;
-      }
-
-      setTambos((actuales) =>
-        actuales.map((t) => (t.id === tambo.id ? { ...t, activo: true } : t)),
-      );
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    }
+    setErrorAccion("");
+    activarTambo.mutate(tambo.id, {
+      onError: (e: Error) => setErrorAccion(e.message),
+    });
   }
+
+  const guardando = crearTambo.isPending || actualizarTambo.isPending;
 
   return (
     <div className="container-fluid mt-4">
@@ -218,10 +160,12 @@ function AltaTambo() {
             </button>
           </div>
 
-          {cargandoListado ? (
+          {errorAccion && <p className="text-danger">{errorAccion}</p>}
+
+          {tambosQuery.isPending ? (
             <p>Cargando tambos...</p>
-          ) : errorListado ? (
-            <p className="text-danger">{errorListado}</p>
+          ) : tambosQuery.isError ? (
+            <p className="text-danger">Error al obtener los tambos.</p>
           ) : tambosFiltrados.length === 0 ? (
             <p className="text-muted">No hay tambos para mostrar.</p>
           ) : (
@@ -306,6 +250,7 @@ function AltaTambo() {
             <div className="d-flex gap-2">
               <button
                 onClick={handleSubmit}
+                disabled={guardando}
                 className="btn btn-primary flex-grow-1"
               >
                 {editandoId ? "Guardar cambios" : "Crear tambo"}

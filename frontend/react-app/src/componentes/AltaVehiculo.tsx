@@ -1,6 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
-import { API_URL, fetchConToken } from "../api";
-import { useDatosReferencia } from "../contextos/DatosReferenciaContext";
+import { useState } from "react";
+import { useEmpresas } from "../hooks/useEmpresas";
+import {
+  useVehiculos,
+  useCrearVehiculo,
+  useActualizarVehiculo,
+  useActivarVehiculo,
+  useDesactivarVehiculo,
+} from "../hooks/useVehiculos";
 
 const FORM_VACIO = {
   patente: "",
@@ -11,12 +17,16 @@ const FORM_VACIO = {
 };
 
 function AltaVehiculo() {
-  const { empresas } = useDatosReferencia();
-  const [vista, setVista] = useState<"listado" | "nuevo">("listado");
+  const { data: empresas = [] } = useEmpresas();
+  const vehiculosQuery = useVehiculos();
+  const vehiculos = vehiculosQuery.data ?? [];
 
-  const [vehiculos, setVehiculos] = useState<any[]>([]);
-  const [cargandoListado, setCargandoListado] = useState(true);
-  const [errorListado, setErrorListado] = useState("");
+  const crearVehiculo = useCrearVehiculo();
+  const actualizarVehiculo = useActualizarVehiculo();
+  const activarVehiculo = useActivarVehiculo();
+  const desactivarVehiculo = useDesactivarVehiculo();
+
+  const [vista, setVista] = useState<"listado" | "nuevo">("listado");
   const [filtroEstado, setFiltroEstado] = useState<
     "activos" | "inactivos" | "todos"
   >("activos");
@@ -26,27 +36,7 @@ function AltaVehiculo() {
 
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
-
-  const fetchVehiculos = useCallback(async () => {
-    setCargandoListado(true);
-    try {
-      const response = await fetchConToken(`${API_URL}/api/v1/vehiculo`);
-      if (!response.ok) {
-        setErrorListado("Error al obtener los vehículos");
-        return;
-      }
-      const data = await response.json();
-      setVehiculos(data || []);
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    } finally {
-      setCargandoListado(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchVehiculos();
-  }, [fetchVehiculos]);
+  const [errorAccion, setErrorAccion] = useState("");
 
   const vehiculosFiltrados = vehiculos.filter((v: any) => {
     if (filtroEstado === "activos") return v.activo;
@@ -85,94 +75,50 @@ function AltaVehiculo() {
     setVista("listado");
   }
 
-  async function handleSubmit() {
-    try {
-      const url = editandoId
-        ? `${API_URL}/api/v1/vehiculo/${editandoId}`
-        : `${API_URL}/api/v1/vehiculo`;
-
-      const response = await fetchConToken(url, {
-        method: editandoId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        setError(
-          data.error ||
-            (editandoId
-              ? "Error al actualizar el vehículo"
-              : "Error al crear el vehículo"),
+  function handleSubmit() {
+    setError("");
+    const alTerminar = {
+      onSuccess: () => {
+        setExito(
+          editandoId
+            ? "Vehículo actualizado correctamente"
+            : "Vehículo creado correctamente",
         );
-        return;
-      }
+        setEditandoId(null);
+        setForm(FORM_VACIO);
+        setVista("listado");
+      },
+      onError: (e: Error) => setError(e.message),
+    };
 
-      setExito(
-        editandoId
-          ? "Vehículo actualizado correctamente"
-          : "Vehículo creado correctamente",
-      );
-      setEditandoId(null);
-      setForm(FORM_VACIO);
-      fetchVehiculos();
-      setVista("listado");
-    } catch (error) {
-      setError("Error al conectar con el servidor");
+    if (editandoId) {
+      actualizarVehiculo.mutate({ id: editandoId, body: form }, alTerminar);
+    } else {
+      crearVehiculo.mutate(form, alTerminar);
     }
   }
 
-  async function handleDesactivar(vehiculo: any) {
+  function handleDesactivar(vehiculo: any) {
     if (!window.confirm(`¿Desactivar el vehículo ${vehiculo.patente}?`)) {
       return;
     }
-
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/vehiculo/${vehiculo.id}`,
-        { method: "DELETE" },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorListado(data.error || "Error al desactivar el vehículo");
-        return;
-      }
-
-      setVehiculos((actuales) =>
-        actuales.map((v) =>
-          v.id === vehiculo.id ? { ...v, activo: false } : v,
-        ),
-      );
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    }
+    setErrorAccion("");
+    desactivarVehiculo.mutate(vehiculo.id, {
+      onError: (e: Error) => setErrorAccion(e.message),
+    });
   }
 
-  async function handleActivar(vehiculo: any) {
+  function handleActivar(vehiculo: any) {
     if (!window.confirm(`¿Reactivar el vehículo ${vehiculo.patente}?`)) {
       return;
     }
-
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/vehiculo/${vehiculo.id}/activar`,
-        { method: "PATCH" },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorListado(data.error || "Error al reactivar el vehículo");
-        return;
-      }
-
-      setVehiculos((actuales) =>
-        actuales.map((v) => (v.id === vehiculo.id ? { ...v, activo: true } : v)),
-      );
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    }
+    setErrorAccion("");
+    activarVehiculo.mutate(vehiculo.id, {
+      onError: (e: Error) => setErrorAccion(e.message),
+    });
   }
+
+  const guardando = crearVehiculo.isPending || actualizarVehiculo.isPending;
 
   return (
     <div className="container-fluid mt-4">
@@ -227,10 +173,12 @@ function AltaVehiculo() {
             </button>
           </div>
 
-          {cargandoListado ? (
+          {errorAccion && <p className="text-danger">{errorAccion}</p>}
+
+          {vehiculosQuery.isPending ? (
             <p>Cargando vehículos...</p>
-          ) : errorListado ? (
-            <p className="text-danger">{errorListado}</p>
+          ) : vehiculosQuery.isError ? (
+            <p className="text-danger">Error al obtener los vehículos.</p>
           ) : vehiculosFiltrados.length === 0 ? (
             <p className="text-muted">No hay vehículos para mostrar.</p>
           ) : (
@@ -362,6 +310,7 @@ function AltaVehiculo() {
             <div className="d-flex gap-2">
               <button
                 onClick={handleSubmit}
+                disabled={guardando}
                 className="btn btn-primary flex-grow-1"
               >
                 {editandoId ? "Guardar cambios" : "Crear vehículo"}

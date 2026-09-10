@@ -1,6 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
-import { API_URL, fetchConToken } from "../api";
-import { useDatosReferencia } from "../contextos/DatosReferenciaContext";
+import { useState } from "react";
+import { useEmpresas } from "../hooks/useEmpresas";
+import {
+  useAcoplados,
+  useCrearAcoplado,
+  useActualizarAcoplado,
+  useActivarAcoplado,
+  useDesactivarAcoplado,
+} from "../hooks/useAcoplados";
 
 const FORM_VACIO = {
   patente: "",
@@ -10,12 +16,16 @@ const FORM_VACIO = {
 };
 
 function AltaAcoplado() {
-  const { empresas } = useDatosReferencia();
-  const [vista, setVista] = useState<"listado" | "nuevo">("listado");
+  const { data: empresas = [] } = useEmpresas();
+  const acopladosQuery = useAcoplados();
+  const acoplados = acopladosQuery.data ?? [];
 
-  const [acoplados, setAcoplados] = useState<any[]>([]);
-  const [cargandoListado, setCargandoListado] = useState(true);
-  const [errorListado, setErrorListado] = useState("");
+  const crearAcoplado = useCrearAcoplado();
+  const actualizarAcoplado = useActualizarAcoplado();
+  const activarAcoplado = useActivarAcoplado();
+  const desactivarAcoplado = useDesactivarAcoplado();
+
+  const [vista, setVista] = useState<"listado" | "nuevo">("listado");
   const [filtroEstado, setFiltroEstado] = useState<
     "activos" | "inactivos" | "todos"
   >("activos");
@@ -25,27 +35,7 @@ function AltaAcoplado() {
 
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
-
-  const fetchAcoplados = useCallback(async () => {
-    setCargandoListado(true);
-    try {
-      const response = await fetchConToken(`${API_URL}/api/v1/acoplado`);
-      if (!response.ok) {
-        setErrorListado("Error al obtener los acoplados");
-        return;
-      }
-      const data = await response.json();
-      setAcoplados(data || []);
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    } finally {
-      setCargandoListado(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchAcoplados();
-  }, [fetchAcoplados]);
+  const [errorAccion, setErrorAccion] = useState("");
 
   const acopladosFiltrados = acoplados.filter((a: any) => {
     if (filtroEstado === "activos") return a.activo;
@@ -83,94 +73,50 @@ function AltaAcoplado() {
     setVista("listado");
   }
 
-  async function handleSubmit() {
-    try {
-      const url = editandoId
-        ? `${API_URL}/api/v1/acoplado/${editandoId}`
-        : `${API_URL}/api/v1/acoplado`;
-
-      const response = await fetchConToken(url, {
-        method: editandoId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        setError(
-          data.error ||
-            (editandoId
-              ? "Error al actualizar el acoplado"
-              : "Error al crear el acoplado"),
+  function handleSubmit() {
+    setError("");
+    const alTerminar = {
+      onSuccess: () => {
+        setExito(
+          editandoId
+            ? "Acoplado actualizado correctamente"
+            : "Acoplado creado correctamente",
         );
-        return;
-      }
+        setEditandoId(null);
+        setForm(FORM_VACIO);
+        setVista("listado");
+      },
+      onError: (e: Error) => setError(e.message),
+    };
 
-      setExito(
-        editandoId
-          ? "Acoplado actualizado correctamente"
-          : "Acoplado creado correctamente",
-      );
-      setEditandoId(null);
-      setForm(FORM_VACIO);
-      fetchAcoplados();
-      setVista("listado");
-    } catch (error) {
-      setError("Error al conectar con el servidor");
+    if (editandoId) {
+      actualizarAcoplado.mutate({ id: editandoId, body: form }, alTerminar);
+    } else {
+      crearAcoplado.mutate(form, alTerminar);
     }
   }
 
-  async function handleDesactivar(acoplado: any) {
+  function handleDesactivar(acoplado: any) {
     if (!window.confirm(`¿Desactivar el acoplado ${acoplado.patente}?`)) {
       return;
     }
-
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/acoplado/${acoplado.id}`,
-        { method: "DELETE" },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorListado(data.error || "Error al desactivar el acoplado");
-        return;
-      }
-
-      setAcoplados((actuales) =>
-        actuales.map((a) =>
-          a.id === acoplado.id ? { ...a, activo: false } : a,
-        ),
-      );
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    }
+    setErrorAccion("");
+    desactivarAcoplado.mutate(acoplado.id, {
+      onError: (e: Error) => setErrorAccion(e.message),
+    });
   }
 
-  async function handleActivar(acoplado: any) {
+  function handleActivar(acoplado: any) {
     if (!window.confirm(`¿Reactivar el acoplado ${acoplado.patente}?`)) {
       return;
     }
-
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/acoplado/${acoplado.id}/activar`,
-        { method: "PATCH" },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorListado(data.error || "Error al reactivar el acoplado");
-        return;
-      }
-
-      setAcoplados((actuales) =>
-        actuales.map((a) => (a.id === acoplado.id ? { ...a, activo: true } : a)),
-      );
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    }
+    setErrorAccion("");
+    activarAcoplado.mutate(acoplado.id, {
+      onError: (e: Error) => setErrorAccion(e.message),
+    });
   }
+
+  const guardando = crearAcoplado.isPending || actualizarAcoplado.isPending;
 
   return (
     <div className="container-fluid mt-4">
@@ -225,10 +171,12 @@ function AltaAcoplado() {
             </button>
           </div>
 
-          {cargandoListado ? (
+          {errorAccion && <p className="text-danger">{errorAccion}</p>}
+
+          {acopladosQuery.isPending ? (
             <p>Cargando acoplados...</p>
-          ) : errorListado ? (
-            <p className="text-danger">{errorListado}</p>
+          ) : acopladosQuery.isError ? (
+            <p className="text-danger">Error al obtener los acoplados.</p>
           ) : acopladosFiltrados.length === 0 ? (
             <p className="text-muted">No hay acoplados para mostrar.</p>
           ) : (
@@ -337,6 +285,7 @@ function AltaAcoplado() {
             <div className="d-flex gap-2">
               <button
                 onClick={handleSubmit}
+                disabled={guardando}
                 className="btn btn-primary flex-grow-1"
               >
                 {editandoId ? "Guardar cambios" : "Crear acoplado"}

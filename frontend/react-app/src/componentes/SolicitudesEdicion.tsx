@@ -1,120 +1,53 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { API_URL, fetchConToken } from "../api";
-import { useEventosSSE } from "../sse";
+import { useState } from "react";
+import { useSolicitudes, useTomarDecision } from "../hooks/useSolicitudes";
 import NombreUsuario from "./NombreUsuario";
 
 function SolicitudesEdicion() {
-  const [solicitudes, setSolicitudes] = useState<any[]>([]);
+  const solicitudesQuery = useSolicitudes();
+  const solicitudes = solicitudesQuery.data ?? [];
+  const decidir = useTomarDecision();
+
   const [solicitudSeleccionada, setSolicitudSeleccionada] = useState<any>(null);
-  const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-  const [toast, setToast] = useState<{
-    mensaje: string;
-    tipo: "warning" | "info";
-  } | null>(null);
 
-  function mostrarToast(mensaje: string, tipo: "warning" | "info") {
-    setToast({ mensaje, tipo });
-    setTimeout(() => setToast(null), 4000);
-  }
+  // El refresco en tiempo real de esta lista y el toast de "llegó una
+  // solicitud nueva" los maneja useSincronizacionSSE en Encargado.tsx.
 
-  const fetchSolicitudes = useCallback(async () => {
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/solicitudEdicion`,
-      );
+  const pendientes = solicitudes.filter(
+    (s: any) => s.estado === "pendiente",
+  ).length;
 
-      if (!response.ok) {
-        setError("Error al obtener las solicitudes");
-        return;
-      }
-
-      const data = await response.json();
-      setSolicitudes(data || []);
-    } catch (error) {
-      setError("Error al conectar con el servidor");
-    } finally {
-      setCargando(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchSolicitudes();
-  }, [fetchSolicitudes]);
-
-  // Tiempo real: una solicitud nueva (de cualquier camionero) o la
-  // resolución de una ya existente refrescan la lista y disparan un aviso
-  // breve. "solicitud_creada" es lo que permite avisar apenas entra una
-  // pendiente nueva, sin esperar a que algo más dispare un refresco.
-  useEventosSSE({
-    solicitud_creada: () => {
-      fetchSolicitudes();
-      mostrarToast("Llegó una solicitud de edición nueva", "warning");
-    },
-    solicitud_resuelta: (datos) => {
-      fetchSolicitudes();
-      mostrarToast(
-        `Una solicitud fue ${datos?.estado === "aprobada" ? "aprobada" : "rechazada"}`,
-        "info",
-      );
-    },
-  });
-
-  const pendientes = useMemo(
-    () => solicitudes.filter((s) => s.estado === "pendiente").length,
-    [solicitudes],
-  );
-
-  async function tomarDecision(id: string, decision: "aprobada" | "rechazada") {
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/solicitudEdicion/${id}/decision`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ decision }),
+  function tomarDecision(id: string, decision: "aprobada" | "rechazada") {
+    setError("");
+    decidir.mutate(
+      { id, decision },
+      {
+        onSuccess: () => {
+          // La lista se refresca sola por la invalidación del hook. Acá solo
+          // sincronizamos la solicitud seleccionada para que el detalle
+          // muestre el nuevo estado sin volver a la lista.
+          setSolicitudSeleccionada((actual: any) =>
+            actual && actual.id === id
+              ? { ...actual, estado: decision }
+              : actual,
+          );
         },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setError(
-          data.error ||
-            "El servidor rechazó la decisión — la solicitud puede haber cambiado de estado",
-        );
-        return;
-      }
-
-      // Solo actualizamos el frontend si el backend confirmó el cambio
-      setSolicitudes((solicitudesActuales) =>
-        solicitudesActuales.map((s) =>
-          s.id === id ? { ...s, estado: decision } : s,
-        ),
-      );
-
-      // También actualizamos la solicitud seleccionada, así el detalle
-      // refleja el nuevo estado sin tener que volver a la lista
-      setSolicitudSeleccionada((actual: any) =>
-        actual ? { ...actual, estado: decision } : actual,
-      );
-    } catch (error) {
-      setError("Error al procesar la decisión");
-    }
+        onError: (e: Error) =>
+          setError(
+            e.message ||
+              "El servidor rechazó la decisión — la solicitud puede haber cambiado de estado",
+          ),
+      },
+    );
   }
 
-  if (cargando) return <p className="p-4">Cargando...</p>;
-  if (error) return <p className="p-4 text-danger">{error}</p>;
+  if (solicitudesQuery.isPending) return <p className="p-4">Cargando...</p>;
+  if (solicitudesQuery.isError)
+    return <p className="p-4 text-danger">Error al obtener las solicitudes</p>;
 
   return (
     <div className="p-4">
-      {toast && (
-        <div
-          className={`toast show position-fixed top-0 end-0 m-3 text-bg-${toast.tipo}`}
-          style={{ zIndex: 1080 }}
-        >
-          <div className="toast-body">{toast.mensaje}</div>
-        </div>
-      )}
+      {error && <p className="text-danger">{error}</p>}
 
       <h2 className="mb-4">
         Solicitudes de edición
@@ -224,6 +157,7 @@ function SolicitudesEdicion() {
               <>
                 <button
                   className="btn btn-success"
+                  disabled={decidir.isPending}
                   onClick={() =>
                     tomarDecision(solicitudSeleccionada.id, "aprobada")
                   }
@@ -232,6 +166,7 @@ function SolicitudesEdicion() {
                 </button>
                 <button
                   className="btn btn-danger"
+                  disabled={decidir.isPending}
                   onClick={() =>
                     tomarDecision(solicitudSeleccionada.id, "rechazada")
                   }

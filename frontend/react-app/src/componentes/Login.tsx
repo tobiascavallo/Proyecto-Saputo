@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { API_URL } from "../api";
+import { queryClient } from "../queryClient";
 
 function Login() {
   // Variable reactiva para el email — arranca vacía
@@ -35,6 +36,10 @@ function Login() {
       }
 
       const data = await response.json();
+
+      // Arrancar de cero: si en esta pestaña hubo otra sesión antes, su
+      // caché de TanStack todavía puede estar vivo (gcTime de minutos).
+      queryClient.clear();
 
       // El backend devuelve "token", no "access_token"
       localStorage.setItem("token", data.token);

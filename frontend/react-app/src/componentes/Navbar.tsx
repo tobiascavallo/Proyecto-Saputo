@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { API_URL } from "../api";
+import { queryClient } from "../queryClient";
 
 function Navbar({
   titulo,
@@ -25,6 +26,13 @@ function Navbar({
 
     localStorage.removeItem("token");
     localStorage.removeItem("refresh_token");
+
+    // Vaciar el caché de TanStack al cerrar sesión: con gcTime de minutos
+    // y el provider a nivel raíz, los datos del usuario que se va sobreviven
+    // hasta el próximo login en la misma pestaña — en una PC compartida eso
+    // filtra información entre usuarios.
+    queryClient.clear();
+
     navigate("/login");
   }
 
