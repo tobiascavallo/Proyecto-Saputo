@@ -42,7 +42,13 @@ const TIPOS_EVENTO: TipoEventoSSE[] = [
   "resultado_actualizado",
 ];
 
-const REINTENTO_MS = 3000;
+// Reconexión con backoff exponencial: 3s → 6s → 12s → 24s → tope 30s.
+// Tras un blip corto reconecta casi tan rápido como antes, pero si el
+// backend está caído deja de martillarlo (antes eran ~2 errores de consola
+// cada 3s indefinidamente: POST /eventos/ticket + EventSource). El contador
+// se resetea al mínimo apenas una conexión se abre bien.
+const REINTENTO_BASE_MS = 3000;
+const REINTENTO_MAX_MS = 30000;
 
 // useEventosSSE recibe un mapa { tipoDeEvento: callback } y mantiene la
 // conexión abierta mientras el componente esté montado. El mapa puede
@@ -56,6 +62,14 @@ export function useEventosSSE(manejadores: ManejadoresSSE) {
     let cerrada = false;
     let eventSource: EventSource | null = null;
     let timeoutReintento: ReturnType<typeof setTimeout> | null = null;
+    let esperaReintento = REINTENTO_BASE_MS;
+
+    function programarReintento() {
+      if (cerrada) return;
+      timeoutReintento = setTimeout(conectar, esperaReintento);
+      // El próximo reintento espera el doble, hasta el tope.
+      esperaReintento = Math.min(esperaReintento * 2, REINTENTO_MAX_MS);
+    }
 
     async function conectar() {
       if (cerrada) return;
@@ -78,6 +92,12 @@ export function useEventosSSE(manejadores: ManejadoresSSE) {
         );
         eventSource = es;
 
+        es.onopen = () => {
+          // Conexión sana: si más adelante se corta, el backoff arranca
+          // de nuevo desde el mínimo.
+          esperaReintento = REINTENTO_BASE_MS;
+        };
+
         TIPOS_EVENTO.forEach((tipo) => {
           es.addEventListener(tipo, (evento: MessageEvent) => {
             const manejador = manejadoresRef.current[tipo];
@@ -88,14 +108,10 @@ export function useEventosSSE(manejadores: ManejadoresSSE) {
 
         es.onerror = () => {
           es.close();
-          if (!cerrada) {
-            timeoutReintento = setTimeout(conectar, REINTENTO_MS);
-          }
+          programarReintento();
         };
       } catch {
-        if (!cerrada) {
-          timeoutReintento = setTimeout(conectar, REINTENTO_MS);
-        }
+        programarReintento();
       }
     }
 

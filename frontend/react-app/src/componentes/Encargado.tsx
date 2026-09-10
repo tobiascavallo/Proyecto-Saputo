@@ -10,7 +10,7 @@ import AltaAcoplado from "./AltaAcoplado";
 import AltaTambero from "./AltaTambero";
 import AltaTambo from "./AltaTambo";
 import Navbar from "./Navbar";
-import { DatosReferenciaProvider } from "../contextos/DatosReferenciaContext";
+import { useSincronizacionSSE } from "../hooks/useSincronizacionSSE";
 
 function Encargado() {
   // Controla si estamos en el panel operativo o en la vista de Gestión
@@ -19,11 +19,45 @@ function Encargado() {
   const [seccionActiva, setSeccionActiva] = useState("remitos");
   const [seccionGestion, setSeccionGestion] = useState("usuarios");
 
-  // El provider envuelve las dos vistas para que los datos de referencia
-  // (usuarios, tambos) se pidan una sola vez por sesión de panel, sin
-  // importar cuántas veces se alterne entre "panel" y "gestion".
+  // Aviso breve para eventos de solicitudes de edición. Vive acá (nivel
+  // panel) y no en SolicitudesEdicion para que el encargado se entere de
+  // una solicitud nueva esté en la pestaña que esté.
+  const [toast, setToast] = useState<{
+    mensaje: string;
+    tipo: "warning" | "info";
+  } | null>(null);
+
+  function mostrarToast(mensaje: string, tipo: "warning" | "info") {
+    setToast({ mensaje, tipo });
+    setTimeout(() => setToast(null), 4000);
+  }
+
+  // Única suscripción SSE del panel: mapea cada evento a la invalidación de
+  // su query key. Los callbacks de solicitudes agregan el toast encima.
+  useSincronizacionSSE({
+    onSolicitudCreada: () =>
+      mostrarToast("Llegó una solicitud de edición nueva", "warning"),
+    onSolicitudResuelta: (datos) =>
+      mostrarToast(
+        `Una solicitud fue ${datos?.estado === "aprobada" ? "aprobada" : "rechazada"}`,
+        "info",
+      ),
+  });
+
+  // Los datos de referencia (usuarios, tambos, etc.) los cachea TanStack
+  // Query a nivel global — cada pantalla pide lo suyo con su hook y el
+  // caché compartido evita refetchs al alternar entre "panel" y "gestion".
   return (
-    <DatosReferenciaProvider>
+    <>
+      {toast && (
+        <div
+          className={`toast show position-fixed top-0 end-0 m-3 text-bg-${toast.tipo}`}
+          style={{ zIndex: 1080 }}
+        >
+          <div className="toast-body">{toast.mensaje}</div>
+        </div>
+      )}
+
       {vista === "gestion" ? (
         // ----- VISTA: GESTIÓN -----
         <>
@@ -146,7 +180,7 @@ function Encargado() {
           </div>
         </>
       )}
-    </DatosReferenciaProvider>
+    </>
   );
 }
 

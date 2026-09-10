@@ -1,7 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { API_URL, fetchConToken } from "../api";
-import { useEventosSSE } from "../sse";
-import { useDatosReferencia } from "../contextos/DatosReferenciaContext";
+import { useState, useRef } from "react";
+import { useNombreTambo } from "../hooks/useTambos";
+import {
+  useRemitos,
+  useLineasDeRemito,
+  buscarLineaPorCodigo,
+  obtenerRemitoPorId,
+} from "../hooks/useRemitos";
+import { useResultados } from "../hooks/useResultados";
 import NombreUsuario from "./NombreUsuario";
 
 interface RemitosProps {
@@ -14,18 +19,23 @@ interface RemitosProps {
 }
 
 function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
-  const { nombreTambo } = useDatosReferencia();
-  const [remitos, setRemitos] = useState<any[]>([]);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState("");
+  const nombreTambo = useNombreTambo();
 
   // Filtro de estado — arranca en "en_curso" para que el aterrizaje sea limpio
   const [filtroEstado, setFiltroEstado] = useState("en_curso");
+  const remitosQuery = useRemitos(filtroEstado, camioneroId);
+  const remitos = remitosQuery.data ?? [];
 
   const [remitoSeleccionado, setRemitoSeleccionado] = useState<any>(null);
-  const [lineasDelRemito, setLineasDelRemito] = useState<any[]>([]);
-  const [resultados, setResultados] = useState<any[]>([]);
-  const [cargandoDetalle, setCargandoDetalle] = useState(false);
+  const [lineaResaltadaId, setLineaResaltadaId] = useState<string | null>(null);
+
+  // Detalle: líneas del remito abierto + listado de resultados (compartido
+  // con ResultadosAnalisis.tsx). Las queries se disparan solas cuando hay un
+  // remito seleccionado.
+  const lineasQuery = useLineasDeRemito(remitoSeleccionado?.id);
+  const resultadosQuery = useResultados();
+  const lineasDelRemito = lineasQuery.data ?? [];
+  const resultados = resultadosQuery.data ?? [];
 
   // Búsqueda por código de muestra (lector de barcode USB) — solo tiene
   // sentido en la vista global, no cuando Remito.tsx está acotado a un
@@ -33,120 +43,31 @@ function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
   const [codigoBusqueda, setCodigoBusqueda] = useState("");
   const [buscandoCodigo, setBuscandoCodigo] = useState(false);
   const [errorBusqueda, setErrorBusqueda] = useState("");
-  const [lineaResaltadaId, setLineaResaltadaId] = useState<string | null>(
-    null,
-  );
   const inputBusquedaRef = useRef<HTMLInputElement>(null);
 
-  // Trae los remitos según el filtro activo. Se reusa tanto para el efecto
-  // que depende de "filtroEstado" como para el refresco disparado por SSE.
-  const fetchRemitos = useCallback(async () => {
-    setCargando(true);
-    try {
-      // "todos" es un valor solo del frontend — si se elige, no mandamos
-      // el query param "estado" y el backend devuelve todo sin filtrar.
-      const params = new URLSearchParams();
-      if (filtroEstado !== "todos") params.set("estado", filtroEstado);
-      if (camioneroId) params.set("camionero_id", camioneroId);
-      const query = params.toString();
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/remito${query ? `?${query}` : ""}`,
-      );
+  // El refresco en tiempo real (remitos, líneas, resultados) lo maneja
+  // useSincronizacionSSE a nivel panel — acá solo se consumen las queries.
 
-      if (!response.ok) {
-        setError("Error al obtener los remitos");
-        return;
-      }
-
-      const data = await response.json();
-      setRemitos(data || []);
-    } catch (error) {
-      setError("Error al conectar con el servidor");
-    } finally {
-      setCargando(false);
-    }
-  }, [filtroEstado, camioneroId]);
-
-  useEffect(() => {
-    fetchRemitos();
-  }, [fetchRemitos]);
-
-  // Trae líneas + resultados de un remito puntual — la usan tanto
-  // abrirDetalleRemito (al entrar al detalle) como los eventos SSE de línea
-  // de más abajo, para refrescar el detalle abierto sin que el Encargado
-  // tenga que recargar la página a mano.
-  const refrescarLineasYResultados = useCallback(async (remitoId: string) => {
-    setCargandoDetalle(true);
-    try {
-      const responseLineas = await fetchConToken(
-        `${API_URL}/api/v1/lineaRecoleccion/remito/${remitoId}`,
-      );
-      const dataLineas = await responseLineas.json();
-      setLineasDelRemito(dataLineas || []);
-
-      const responseResultados = await fetchConToken(
-        `${API_URL}/api/v1/resultadoAnalisis`,
-      );
-      const dataResultados = await responseResultados.json();
-      setResultados(dataResultados || []);
-    } catch (error) {
-      setError("Error al obtener el detalle del remito");
-    } finally {
-      setCargandoDetalle(false);
-    }
-  }, []);
-
-  // Abre el detalle de un remito (líneas + resultados) — lo usan tanto "Ver
-  // detalle" como la búsqueda por código de muestra. lineaAResaltar marca
-  // la fila que hay que destacar en la tabla de líneas (null si se entró
-  // por el botón normal, sin ninguna línea puntual en mente).
-  async function abrirDetalleRemito(
+  function abrirDetalleRemito(
     remito: any,
     lineaAResaltar: string | null = null,
   ) {
     setRemitoSeleccionado(remito);
     setLineaResaltadaId(lineaAResaltar);
-    await refrescarLineasYResultados(remito.id);
   }
 
-  // Se ejecuta cuando el usuario clickea "Ver detalle" de un remito
   function verDetalleRemito(remito: any) {
     abrirDetalleRemito(remito);
   }
 
-  // Tiempo real: los eventos solo traen IDs, así que la reacción es
-  // refrescar lo que corresponda en vez de parchear estado con datos
-  // parciales. remito_creado afecta la lista (puede ser un remito nuevo
-  // "en curso" que todavía no se ve); linea_creada/linea_actualizada no
-  // cambian nada a nivel remito, así que solo tiene sentido refrescar el
-  // detalle si hay uno abierto — y solo si es el remito afectado.
-  useEventosSSE({
-    remito_sincronizado: fetchRemitos,
-    remito_finalizado: fetchRemitos,
-    remito_creado: fetchRemitos,
-    linea_creada: (datos: any) => {
-      if (remitoSeleccionado && datos?.remitoId === remitoSeleccionado.id) {
-        refrescarLineasYResultados(remitoSeleccionado.id);
-      }
-    },
-    linea_actualizada: (datos: any) => {
-      if (remitoSeleccionado && datos?.lineaId) {
-        refrescarLineasYResultados(remitoSeleccionado.id);
-      }
-    },
-  });
-
   function volverALista() {
     setRemitoSeleccionado(null);
-    setLineasDelRemito([]);
-    setResultados([]);
     setLineaResaltadaId(null);
   }
 
-  // Busca la línea por código de muestra, resuelve su remito y abre el
-  // detalle con esa línea resaltada. Se dispara con Enter (el lector de
-  // barcode USB "tipea" el código y manda un Enter automático) y siempre
-  // devuelve el foco al input al terminar, para poder escanear de corrido.
+  // Busca la línea por código, resuelve su remito y abre el detalle con esa
+  // línea resaltada. Se dispara con Enter (el lector de barcode "tipea" el
+  // código y manda un Enter automático) y siempre devuelve el foco al input.
   async function buscarPorCodigo() {
     if (!codigoBusqueda.trim()) return;
 
@@ -154,36 +75,13 @@ function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
     setErrorBusqueda("");
 
     try {
-      const responseLinea = await fetchConToken(
-        `${API_URL}/api/v1/lineaRecoleccion/codigo?codigo=${codigoBusqueda}`,
+      const linea = await buscarLineaPorCodigo(codigoBusqueda);
+      const remito = await obtenerRemitoPorId(linea.remito_id);
+      abrirDetalleRemito(remito, linea.id);
+    } catch (e) {
+      setErrorBusqueda(
+        e instanceof Error ? e.message : "Error al conectar con el servidor",
       );
-
-      if (!responseLinea.ok) {
-        const data = await responseLinea.json();
-        setErrorBusqueda(
-          data.error || "No se encontró ninguna línea con ese código",
-        );
-        return;
-      }
-
-      const linea = await responseLinea.json();
-
-      const responseRemito = await fetchConToken(
-        `${API_URL}/api/v1/remito/${linea.remito_id}`,
-      );
-
-      if (!responseRemito.ok) {
-        const data = await responseRemito.json();
-        setErrorBusqueda(
-          data.error || "No se pudo abrir el remito de esa línea",
-        );
-        return;
-      }
-
-      const remito = await responseRemito.json();
-      await abrirDetalleRemito(remito, linea.id);
-    } catch (error) {
-      setErrorBusqueda("Error al conectar con el servidor");
     } finally {
       setBuscandoCodigo(false);
       setCodigoBusqueda("");
@@ -191,7 +89,6 @@ function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
     }
   }
 
-  // Se dispara con cada tecla — nos interesa detectar específicamente "Enter"
   function manejarTeclaBusqueda(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       buscarPorCodigo();
@@ -209,8 +106,6 @@ function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
       return <span className="badge bg-danger">Contaminada</span>;
     return <span className="badge bg-warning">Pendiente</span>;
   }
-
-  if (error) return <p className="p-4 text-danger">{error}</p>;
 
   return (
     <div className="p-4">
@@ -249,8 +144,10 @@ function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
             </button>
           </div>
 
-          {cargando ? (
+          {remitosQuery.isPending ? (
             <p>Cargando remitos...</p>
+          ) : remitosQuery.isError ? (
+            <p className="text-danger">Error al obtener los remitos.</p>
           ) : (
             <table className="table table-striped table-hover">
               <thead className="table-dark">
@@ -353,8 +250,12 @@ function Remitos({ camioneroId, nombreCamionero, onVolver }: RemitosProps) {
 
           <h2 className="mb-4">Remito {remitoSeleccionado.numero_remito}</h2>
 
-          {cargandoDetalle ? (
+          {lineasQuery.isPending ? (
             <p>Cargando líneas de recolección...</p>
+          ) : lineasQuery.isError ? (
+            <p className="text-danger">
+              Error al obtener las líneas del remito.
+            </p>
           ) : lineasDelRemito.length === 0 ? (
             <p className="text-muted">
               Este remito todavía no tiene líneas de recolección cargadas.

@@ -1,7 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
-import { API_URL, fetchConToken } from "../api";
+import { useState } from "react";
 import DatosCamionero from "./DatosCamionero";
-import { useDatosReferencia } from "../contextos/DatosReferenciaContext";
+import {
+  useUsuarios,
+  useCrearUsuario,
+  useActualizarUsuario,
+  useActivarUsuario,
+  useDesactivarUsuario,
+} from "../hooks/useUsuarios";
 
 const FORM_VACIO = {
   nombre: "",
@@ -14,15 +19,19 @@ const FORM_VACIO = {
 };
 
 function AltaUsuario() {
-  const { invalidarUsuarios } = useDatosReferencia();
+  const usuariosQuery = useUsuarios();
+  const usuarios = usuariosQuery.data ?? [];
+
+  const crearUsuario = useCrearUsuario();
+  const actualizarUsuario = useActualizarUsuario();
+  const activarUsuario = useActivarUsuario();
+  const desactivarUsuario = useDesactivarUsuario();
+
   const [vista, setVista] = useState<"listado" | "nuevo" | "datosCamionero">(
     "listado",
   );
   const [usuarioCreadoId, setUsuarioCreadoId] = useState<string | null>(null);
 
-  const [usuarios, setUsuarios] = useState<any[]>([]);
-  const [cargandoListado, setCargandoListado] = useState(true);
-  const [errorListado, setErrorListado] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<
     "activos" | "inactivos" | "todos"
   >("activos");
@@ -32,27 +41,7 @@ function AltaUsuario() {
 
   const [error, setError] = useState("");
   const [exito, setExito] = useState("");
-
-  const fetchUsuarios = useCallback(async () => {
-    setCargandoListado(true);
-    try {
-      const response = await fetchConToken(`${API_URL}/api/v1/usuario`);
-      if (!response.ok) {
-        setErrorListado("Error al obtener los usuarios");
-        return;
-      }
-      const data = await response.json();
-      setUsuarios(data || []);
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    } finally {
-      setCargandoListado(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchUsuarios();
-  }, [fetchUsuarios]);
+  const [errorAccion, setErrorAccion] = useState("");
 
   const usuariosFiltrados = usuarios.filter((u: any) => {
     if (filtroEstado === "activos") return u.activo;
@@ -93,10 +82,9 @@ function AltaUsuario() {
     setVista("listado");
   }
 
-  async function handleSubmit() {
-    // Validación básica del lado del cliente — evita gastar una llamada al
-    // backend con datos que ya sabemos inválidos. En edición, el DNI es
-    // opcional: si se deja vacío no se toca; si se completa, debe ser válido.
+  function handleSubmit() {
+    // Validación básica del lado del cliente. En edición, el DNI es opcional:
+    // si se deja vacío no se toca; si se completa, debe ser válido.
     if (!editandoId && !dniValido(form.dni)) {
       setError("El DNI debe tener 7 u 8 dígitos numéricos");
       return;
@@ -110,130 +98,72 @@ function AltaUsuario() {
       return;
     }
 
-    try {
-      const url = editandoId
-        ? `${API_URL}/api/v1/usuario/${editandoId}`
-        : `${API_URL}/api/v1/usuario`;
+    setError("");
 
-      const response = await fetchConToken(url, {
-        method: editandoId ? "PUT" : "POST",
-        headers: {
-          "Content-Type": "application/json",
+    if (editandoId) {
+      actualizarUsuario.mutate(
+        { id: editandoId, body: form },
+        {
+          onSuccess: () => {
+            setExito("Usuario actualizado correctamente");
+            setEditandoId(null);
+            setForm(FORM_VACIO);
+            setVista("listado");
+          },
+          onError: (e: Error) => setError(e.message),
         },
-        body: JSON.stringify(form),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        setError(
-          data.error ||
-            (editandoId
-              ? "Error al actualizar el usuario"
-              : "Error al crear el usuario"),
-        );
-        return;
-      }
-
-      // Edición: mensaje de éxito y de vuelta al listado.
-      if (editandoId) {
-        setExito("Usuario actualizado correctamente");
-        setEditandoId(null);
-        setForm(FORM_VACIO);
-        fetchUsuarios();
-        setVista("listado");
-        return;
-      }
-
-      const data = await response.json();
-      const rolCreado = form.rol;
-
-      setForm(FORM_VACIO);
-
-      // El usuario nuevo todavía no está en el caché compartido del
-      // contexto (se cargó una sola vez al entrar al panel) — sin esto,
-      // seguiría apareciendo como ID crudo en Remitos/Solicitudes hasta
-      // que alguien recargue la página a mano.
-      invalidarUsuarios();
-
-      // Si el usuario nuevo es camionero, el alta no termina acá — falta
-      // completar la empresa transportista en un segundo paso. Si no,
-      // el flujo de siempre: mensaje de éxito y de vuelta al listado.
-      if (rolCreado === "camionero") {
-        setUsuarioCreadoId(data.id);
-        setVista("datosCamionero");
-      } else {
-        setExito("Usuario creado correctamente");
-        fetchUsuarios();
-        setVista("listado");
-      }
-    } catch (error) {
-      setError("Error al conectar con el servidor");
-    }
-  }
-
-  async function handleDesactivar(usuario: any) {
-    if (
-      !window.confirm(
-        `¿Desactivar a ${usuario.nombre} ${usuario.apellido}?`,
-      )
-    ) {
+      );
       return;
     }
 
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/usuario/${usuario.id}`,
-        { method: "DELETE" },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorListado(data.error || "Error al desactivar el usuario");
-        return;
-      }
-
-      setUsuarios((actuales) =>
-        actuales.map((u) =>
-          u.id === usuario.id ? { ...u, activo: false } : u,
-        ),
-      );
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    }
+    const rolCreado = form.rol;
+    crearUsuario.mutate(form, {
+      onSuccess: (data) => {
+        setForm(FORM_VACIO);
+        // Si el usuario nuevo es camionero, el alta no termina acá — falta
+        // completar la empresa transportista en un segundo paso.
+        if (rolCreado === "camionero") {
+          setUsuarioCreadoId(data.id);
+          setVista("datosCamionero");
+        } else {
+          setExito("Usuario creado correctamente");
+          setVista("listado");
+        }
+      },
+      onError: (e: Error) => setError(e.message),
+    });
   }
 
-  async function handleActivar(usuario: any) {
+  function handleDesactivar(usuario: any) {
+    if (
+      !window.confirm(`¿Desactivar a ${usuario.nombre} ${usuario.apellido}?`)
+    ) {
+      return;
+    }
+    setErrorAccion("");
+    desactivarUsuario.mutate(usuario.id, {
+      onError: (e: Error) => setErrorAccion(e.message),
+    });
+  }
+
+  function handleActivar(usuario: any) {
     if (
       !window.confirm(`¿Reactivar a ${usuario.nombre} ${usuario.apellido}?`)
     ) {
       return;
     }
-
-    try {
-      const response = await fetchConToken(
-        `${API_URL}/api/v1/usuario/${usuario.id}/activar`,
-        { method: "PATCH" },
-      );
-
-      if (!response.ok) {
-        const data = await response.json();
-        setErrorListado(data.error || "Error al reactivar el usuario");
-        return;
-      }
-
-      setUsuarios((actuales) =>
-        actuales.map((u) => (u.id === usuario.id ? { ...u, activo: true } : u)),
-      );
-    } catch (error) {
-      setErrorListado("Error al conectar con el servidor");
-    }
+    setErrorAccion("");
+    activarUsuario.mutate(usuario.id, {
+      onError: (e: Error) => setErrorAccion(e.message),
+    });
   }
 
   function finalizarDatosCamionero() {
     setUsuarioCreadoId(null);
-    fetchUsuarios();
     setVista("listado");
   }
+
+  const guardando = crearUsuario.isPending || actualizarUsuario.isPending;
 
   return (
     <div className="container-fluid mt-4">
@@ -298,10 +228,12 @@ function AltaUsuario() {
             </button>
           </div>
 
-          {cargandoListado ? (
+          {errorAccion && <p className="text-danger">{errorAccion}</p>}
+
+          {usuariosQuery.isPending ? (
             <p>Cargando usuarios...</p>
-          ) : errorListado ? (
-            <p className="text-danger">{errorListado}</p>
+          ) : usuariosQuery.isError ? (
+            <p className="text-danger">Error al obtener los usuarios.</p>
           ) : usuariosFiltrados.length === 0 ? (
             <p className="text-muted">No hay usuarios para mostrar.</p>
           ) : (
@@ -443,6 +375,7 @@ function AltaUsuario() {
             <div className="d-flex gap-2">
               <button
                 onClick={handleSubmit}
+                disabled={guardando}
                 className="btn btn-primary flex-grow-1"
               >
                 {editandoId ? "Guardar cambios" : "Crear usuario"}

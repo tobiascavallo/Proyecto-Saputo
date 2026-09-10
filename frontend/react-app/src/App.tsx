@@ -5,7 +5,6 @@
 // Navigate: redirige al usuario a otra ruta
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
-import { useEffect } from "react";
 
 // Importamos los componentes que vamos a mostrar en cada ruta
 import Login from "./componentes/Login";
@@ -27,21 +26,19 @@ function RutaProtegida({
     return <Navigate to="/login" />;
   }
 
-  const payload: any = jwtDecode(token);
-
-  if (!rolesPermitidos.includes(payload.rol)) {
+  // El token puede estar corrupto o con formato inválido (ej. quedó a
+  // medias en localStorage). Si jwtDecode tira, tratamos la sesión como
+  // no válida en vez de romper el render.
+  let rol: string | null = null;
+  try {
+    rol = (jwtDecode(token) as { rol?: string }).rol ?? null;
+  } catch {
     return <Navigate to="/login" />;
   }
-  useEffect(() => {
-    function manejarPageshow(event: PageTransitionEvent) {
-      if (event.persisted) {
-        window.location.reload();
-      }
-    }
 
-    window.addEventListener("pageshow", manejarPageshow);
-    return () => window.removeEventListener("pageshow", manejarPageshow);
-  }, []);
+  if (!rol || !rolesPermitidos.includes(rol)) {
+    return <Navigate to="/login" />;
+  }
 
   return children;
 }
